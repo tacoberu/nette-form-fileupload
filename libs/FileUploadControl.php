@@ -25,9 +25,9 @@ use Stringable;
 class FileUploadControl extends NetteUploadControl
 {
 
-	function __construct(string|Stringable|null $label = null, bool $multiple = false)
+	function __construct(string|Stringable|null $label = null)
 	{
-		parent::__construct($label, $multiple);
+		parent::__construct($label, false);
 		$this->setHtmlAttribute('data-taco-type', 'fileupload');
 	}
 
