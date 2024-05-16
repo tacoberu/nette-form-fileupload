@@ -73,6 +73,16 @@ class FileUploadControl extends NetteUploadControl
 
 
 
+	function validate(): void
+	{
+		if ($this->value instanceof CurrentFileUploadValue) {
+			return;
+		}
+		parent::validate();
+	}
+
+
+
 	/**
 	 * @return static
 	 */
@@ -162,6 +172,17 @@ class NewFileUploadValue implements FileUploadValue
 	function getError(): int
 	{
 		return $this->file->getError();
+	}
+
+
+
+	/**
+	 * Detects the MIME content type of the uploaded file based on its signature. Requires PHP extension fileinfo.
+	 * If the upload was not successful or the detection failed, it returns null.
+	 */
+	function getContentType(): ?string
+	{
+		return $this->file->getContentType();
 	}
 
 
