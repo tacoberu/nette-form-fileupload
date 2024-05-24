@@ -8,6 +8,7 @@ namespace Taco\Nette\Forms\Controls;
 
 use Nette\Forms\Form;
 use Nette\Forms\Controls\UploadControl as NetteUploadControl;
+use Nette\Forms\Controls\SubmitButton;
 use Nette\Http\FileUpload;
 use Nette\Utils\Html;
 use Stringable;
@@ -27,7 +28,7 @@ use Taco\Nette\Http\FileUploaded;
  *
  * @author Martin Takáč <martin@takac.name>
  */
-class FileUploadControl extends NetteUploadControl
+class FileControl extends NetteUploadControl
 {
 
 	/**
@@ -72,15 +73,16 @@ class FileUploadControl extends NetteUploadControl
 	function __construct(string|Stringable|null $label = null, UploadStore $store = Null)
 	{
 		parent::__construct($label, false);
-		$this->setHtmlAttribute('data-taco-type', 'fileupload');
+		$this->setHtmlAttribute('data-taco-type', 'file');
 		$this->store = (!empty($store)) ? $store : new UploadStoreTemp();
 		$this->container = Html::el('div', [
-			'data-taco-type' => 'fileupload',
+			'class' => 'taco-file-control',
 		]);
 		$this->removeButton = Html::el('input', [
 			'type' => 'submit',
 			'value' => $this->translate('x'),
 			'title' => $this->translate('Remove'),
+			'formnovalidate' => '',
 		]);
 		$this->currentControl = Html::el('input', [
 			'readonly' => 1,
@@ -137,6 +139,7 @@ class FileUploadControl extends NetteUploadControl
 
 		if ($this->getHttpData(Form::DataLine, '[remove]')) {
 			$this->value = null;
+			$this->form->setSubmittedBy((new SubmitButton())->setValidationScope([]));
 		}
 	}
 
@@ -214,8 +217,8 @@ class FileUploadControl extends NetteUploadControl
 				return $this->container
 					->addHtml($this->getCurrentPart($name, $this->value))
 					->addHtml($this->getPreviewControlPart($this->value))
-					->addHtml($this->getRenameButtonPart($name))
-					->addHtml(self::renameName(parent::getControl(), $name . '[new]'))
+					->addHtml($this->getRemoveButtonPart($name))
+					->addHtml($this->getNewControlPart($name, withoutRequired: True))
 					->addHtml($this->getTransactionControlPart($name));
 
 			// No file selected
@@ -224,7 +227,7 @@ class FileUploadControl extends NetteUploadControl
 			case empty($this->value):
 				$name = $this->getHtmlName();
 				return $this->container
-					->addHtml(self::renameName(parent::getControl(), $name . '[new]'))
+					->addHtml($this->getNewControlPart($name, withoutRequired: False))
 					->addHtml($this->getTransactionControlPart($name));
 
 			default:
@@ -254,7 +257,7 @@ class FileUploadControl extends NetteUploadControl
 
 
 
-	function getRenameButtonPart(string $name): Html
+	function getRemoveButtonPart(string $name): Html
 	{
 		$el = clone $this->removeButton;
 		$el->name = $name . '[remove]';
@@ -302,19 +305,31 @@ class FileUploadControl extends NetteUploadControl
 
 
 
-	private function getTransactionControlPart(string $name): Html
+	private function getNewControlPart(string $name, bool $withoutRequired): Html
 	{
-		$el = clone $this->transactionControl;
-		$el->name = $name . '[transaction]';
-		$el->value = $this->store->getId();
+		$el = clone parent::getControl();
+		$el->name = $name . '[new]';
+		// Existenci validujeme podle $name[current], ale nový záznam podle $name[new].
+		if ($withoutRequired) {
+			unset($el->required);
+			$netteRules = $el->{'data-nette-rules'};
+			foreach ($netteRules as $i => $x) {
+				if ($x['op'] === Form::Filled) {
+					unset($netteRules[$i]);
+				}
+			}
+			$el->setAttribute('data-nette-rules', array_values($netteRules));
+		}
 		return $el;
 	}
 
 
 
-	private static function renameName(Html $el, string $name): Html
+	private function getTransactionControlPart(string $name): Html
 	{
-		$el->name = $name;
+		$el = clone $this->transactionControl;
+		$el->name = $name . '[transaction]';
+		$el->value = $this->store->getId();
 		return $el;
 	}
 
@@ -331,7 +346,7 @@ class FileUploadControl extends NetteUploadControl
 
 
 	/**
-	 * @param string $s 'image/jpeg#tasks/6s3qva8l/4728-05.jpg'
+	 * @param string $src 'image/jpeg#tasks/6s3qva8l/4728-05.jpg'
 	 */
 	private static function createFileUploadedFromValue(string $src): FileUploaded
 	{
