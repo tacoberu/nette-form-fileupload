@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright (c) since 2010 Martin Takáč (http://martin.takac.name)
+ * Copyright (c) since 2004 Martin Takáč (http://martin.takac.name)
  * @license   https://opensource.org/licenses/MIT MIT
  */
 
@@ -9,9 +9,10 @@ namespace Taco\Nette\Forms\Controls;
 use Nette\Forms\Form;
 use Nette\Forms\Controls\UploadControl as NetteUploadControl;
 use Nette\Http\FileUpload;
-use Nette\Utils\Arrays;
+use Nette\Utils\Html;
 use Stringable;
-
+use LogicException;
+use Taco\Nette\Http\FileUploaded;
 
 
 /**
@@ -20,29 +21,122 @@ use Stringable;
  * - or want to delete the file,
  * - or want to replace the file with another version.
  *
+ * We load the files into the transaction. So in the case of an unrelated form error, we don't have to select the file and reload it.
+ *
+ * In the case of an unsuccessful error or a deleted file, value == Null.
+ *
  * @author Martin Takáč <martin@takac.name>
  */
 class FileUploadControl extends NetteUploadControl
 {
 
-	function __construct(string|Stringable|null $label = null)
+	/**
+	 * A repository holding uploaded files before they are actually saved.
+	 * By default it's just a temp directory, see UploadStoreTemp
+	 *
+	 * @var UploadStore
+	 */
+	private $store;
+
+	/**
+	 * @var FilePreviewer
+	 */
+	private $previewer;
+
+	/**
+	 * @var Html
+	 */
+	private $container;
+
+	/**
+	 * @var Html  remove button template
+	 */
+	private $removeButton;
+
+	/**
+	 * @var Html  current file template
+	 */
+	private $currentControl;
+
+	/**
+	 * @var Html
+	 */
+	private $previewControl;
+
+	/**
+	 * @var Html
+	 */
+	private $transactionControl;
+
+
+	function __construct(string|Stringable|null $label = null, UploadStore $store = Null)
 	{
 		parent::__construct($label, false);
 		$this->setHtmlAttribute('data-taco-type', 'fileupload');
+		$this->store = (!empty($store)) ? $store : new UploadStoreTemp();
+		$this->container = Html::el('div', [
+			'data-taco-type' => 'fileupload',
+		]);
+		$this->removeButton = Html::el('input', [
+			'type' => 'submit',
+			'value' => $this->translate('x'),
+			'title' => $this->translate('Remove'),
+		]);
+		$this->currentControl = Html::el('input', [
+			'readonly' => 1,
+			'style' => 'display: none',
+		]);
+		$this->previewControl = Html::el('input', [
+			'readonly' => 1,
+		]);
+		$this->transactionControl = Html::el('input', [
+			'type' => 'hidden',
+		]);
 	}
 
 
 
+	/**
+	 * By setting the previewer, uploaded files will be represented by their respective previews.
+	 */
+	function setPreviewer(FilePreviewer $var)
+	{
+		$this->previewer = $var;
+		return $this;
+	}
+
+
+
+	/**
+	 * Loads HTTP data. File moved to transaction.
+	 *
+	 * @return void
+	 */
 	function loadHttpData(): void
 	{
-		if ($value = $this->getHttpData(Form::DataFile)) {
-			$this->value = new NewFileUploadValue($value);
+		// When I add a new Upload to the running request, the transaction number is missing
+		$this->store->setId($this->getHttpData(Form::DataLine, '[transaction]'));
+
+		if ($file = $this->getHttpData(Form::DataFile, '[new]')) {
+			if ($file->isOk()) {
+				$this->value = $this->store->append($file);
+			}
+			else {
+				$this->addError($this->translate(self::formatError($file)));
+				$this->value = Null;
+			}
 		}
-		elseif ($value = $this->getHttpData(Form::DataText)) {
-			$this->value = new CurrentFileUploadValue($value);
+		elseif ($value = $this->getHttpData(Form::DataText, '[current]')) {
+			$this->value = self::createFileUploadedFromValue($value);
+			// If it's in the store, it's not committed. How else would he get here?
+			$this->value->setCommited(! $this->store->exists($this->value->getId()));
 		}
 		else {
-			$this->value = new NewFileUploadValue(new FileUpload([]));
+			$this->value = null;
+		}
+
+		if ($this->getHttpData(Form::DataLine, '[remove]')) {
+			$this->value = null;
 		}
 	}
 
@@ -53,9 +147,7 @@ class FileUploadControl extends NetteUploadControl
 	 */
 	function isOk(): bool
 	{
-		return $this->value instanceof FileUploadValue
-			? $this->value->isOk()
-			: $this->value && Arrays::every($this->value, fn(FileUploadValue $upload): bool => $upload->isOk());
+		return True;
 	}
 
 
@@ -89,151 +181,198 @@ class FileUploadControl extends NetteUploadControl
 	function setValue($value)
 	{
 		if ($value instanceof FileUpload) {
-			$value = new NewFileUploadValue($value);
+			dump($value);
+			die("\n------\n" . __file__ . ':' . __line__ . "\n");
 		}
-		elseif (is_string($value) && strlen($value)) {
-			$value = new CurrentFileUploadValue($value);
+		elseif ($value instanceof FileUploaded) {
+			$value = clone $value;
+			$value->setCommited(True);
+			$this->value = $value;
 		}
-		$this->setValueInternal($value);
+		elseif (empty($value)) {
+			$this->value = Null;
+		}
+		else {
+			dump($value);
+			die("\n------\n" . __file__ . ':' . __line__ . "\n");
+		}
 		return $this;
 	}
 
 
 
-	private function setValueInternal(?FileUploadValue $val): void
+	/**
+	 * All service inputs are unnamed. This will ensure that they are not sent to the server.
+	 */
+	function getControl()
 	{
-		if ($val && $val instanceof NewFileUploadValue) {
-			$this->control->type = 'file';
+		switch (True) {
+			// Some file in the transaction.
+			// The second round of the form
+			case $this->value instanceof FileUploaded:
+				$name = $this->getHtmlName();
+				return $this->container
+					->addHtml($this->getCurrentPart($name, $this->value))
+					->addHtml($this->getPreviewControlPart($this->value))
+					->addHtml($this->getRenameButtonPart($name))
+					->addHtml(self::renameName(parent::getControl(), $name . '[new]'))
+					->addHtml($this->getTransactionControlPart($name));
+
+			// No file selected
+			// No default file
+			// The first round of the form
+			case empty($this->value):
+				$name = $this->getHtmlName();
+				return $this->container
+					->addHtml(self::renameName(parent::getControl(), $name . '[new]'))
+					->addHtml($this->getTransactionControlPart($name));
+
+			default:
+				throw new LogicException("oops");
 		}
-		elseif ($val && $val instanceof CurrentFileUploadValue) {
-			$this->control->type = 'text';
-			$this->control->value = $val->getValue();
-		}
-		$this->value = $val;
-	}
-
-}
-
-
-
-interface FileUploadValue
-{
-	function isOk(): bool;
-
-	function isFilled(): bool;
-
-	function getSize(): int;
-
-	function getError(): int;
-
-}
-
-
-
-class NewFileUploadValue implements FileUploadValue
-{
-	private FileUpload $file;
-
-	function __construct(FileUpload $file)
-	{
-		$this->file = $file;
-	}
-
-
-
-	function isOk(): bool
-	{
-		return $this->file->isOk();
 	}
 
 
 
 	/**
-	 * Has been any file uploaded?
+	 * Returns container HTML element template.
 	 */
-	function isFilled(): bool
+	function getContainerPrototype(): Html
 	{
-		return $this->file->getError() !== UPLOAD_ERR_NO_FILE; // ignore null object
-		//~ return $this->file instanceof FileUpload
-			//~ ? $this->file->getError() !== UPLOAD_ERR_NO_FILE // ignore null object
-			//~ : (bool) $this->file->value;
-			//~ : true;
-	}
-
-
-
-	function getSize(): int
-	{
-		return $this->file->getSize();
-	}
-
-
-
-	function getError(): int
-	{
-		return $this->file->getError();
+		return $this->container;
 	}
 
 
 
 	/**
-	 * Detects the MIME content type of the uploaded file based on its signature. Requires PHP extension fileinfo.
-	 * If the upload was not successful or the detection failed, it returns null.
+	 * Returns remove button HTML element template.
 	 */
-	function getContentType(): ?string
+	function getRemoveButtonPrototype(): Html
 	{
-		return $this->file->getContentType();
+		return $this->removeButton;
 	}
 
 
 
-	function getFileUpload(): FileUpload
+	function getRenameButtonPart(string $name): Html
 	{
-		return $this->file;
-	}
-
-}
-
-
-
-class CurrentFileUploadValue implements FileUploadValue
-{
-
-	private string $filename;
-
-	function __construct(string $filename)
-	{
-		$this->filename = $filename;
+		$el = clone $this->removeButton;
+		$el->name = $name . '[remove]';
+		return $el;
 	}
 
 
-	function isOk(): bool
+
+	/**
+	 * Returns current file HTML element template.
+	 */
+	function getCurrentControlPrototype(): Html
 	{
-		return True;
+		return $this->currentControl;
 	}
 
 
-	function isFilled(): bool
+
+	function getCurrentPart(string $name, FileUploaded $value): Html
 	{
-		return True;
+		$el = clone $this->currentControl;
+		$el->value = self::serializeFile($value);
+		$el->name = $name . '[current]';
+		return $el;
 	}
 
 
-	function getSize(): int
+
+	function getPreviewControlPrototype(): Html
 	{
-		return 1;
+		return $this->previewControl;
 	}
 
 
-	function getError(): int
+
+	function getPreviewControlPart(FileUploaded $src): Html
 	{
-		return 0;
+		if (empty($this->previewer)) {
+			$el = clone $this->previewControl;
+			$el->value = $src->getName();
+			return $el;
+		}
+		return $this->previewer->getPreviewControlFor($src);
 	}
 
 
-	function getValue(): string
+
+	private function getTransactionControlPart(string $name): Html
 	{
-		return $this->filename;
+		$el = clone $this->transactionControl;
+		$el->name = $name . '[transaction]';
+		$el->value = $this->store->getId();
+		return $el;
+	}
+
+
+
+	private static function renameName(Html $el, string $name): Html
+	{
+		$el->name = $name;
+		return $el;
+	}
+
+
+
+	/**
+	 * @return string 'image/jpeg#tasks/6s3qva8l/4728-05.jpg'
+	 */
+	private static function serializeFile(FileUploaded $src): string
+	{
+		return $src->getContentType() . '#' . $src->getId();
+	}
+
+
+
+	/**
+	 * @param string $s 'image/jpeg#tasks/6s3qva8l/4728-05.jpg'
+	 */
+	private static function createFileUploadedFromValue(string $src): FileUploaded
+	{
+		list($type, $path) = explode('#', $src, 2);
+		return new FileUploaded($path, $type);
+	}
+
+
+
+	private static function formatError(FileUploaded $file): string
+	{
+		switch ($file->error) {
+			case UPLOAD_ERR_OK:
+				throw LogicException('No error.');
+			case UPLOAD_ERR_INI_SIZE:
+				$message = "The uploaded file exceeds the upload_max_filesize directive in php.ini";
+				break;
+			case UPLOAD_ERR_FORM_SIZE:
+				$message = "The uploaded file exceeds the MAX_FILE_SIZE directive that was specified in the HTML form";
+				break;
+			case UPLOAD_ERR_PARTIAL:
+				$message = "The uploaded file was only partially uploaded";
+				break;
+			case UPLOAD_ERR_NO_FILE:
+				$message = "No file was uploaded";
+				break;
+			case UPLOAD_ERR_NO_TMP_DIR:
+				$message = "Missing a temporary folder";
+				break;
+			case UPLOAD_ERR_CANT_WRITE:
+				$message = "Failed to write file to disk";
+				break;
+			case UPLOAD_ERR_EXTENSION:
+				$message = "File upload stopped by extension";
+				break;
+			default:
+				$message = "Unknown upload error";
+				break;
+		}
+
+		return "{$file->name}: {$message}";
 	}
 
 }
