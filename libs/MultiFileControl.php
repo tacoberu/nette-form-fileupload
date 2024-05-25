@@ -11,48 +11,27 @@ use Nette,
 	Nette\Utils\Validators,
 	Nette\Forms\Form,
 	Nette\Forms\Controls\BaseControl,
+	Nette\Forms\Controls\SubmitButton,
+	Nette\Forms\Controls\UploadControl as NetteUploadControl,
 	Nette\Http\FileUpload;
-use RuntimeException;
 use LogicException;
 use Stringable;
 
 
 /**
- * File management. In the form, we may already have pre-filled files that we may want to remove/delete. We can freely add and remove files. Nothing is saved (but everything is kept in the transaction) until we save the form.
+ * If we have the file already uploaded, we can
+ * - just want to display it (edit other details),
+ * - or want to delete the file,
+ * - or want to replace the file with another version.
+ *
+ * We load the files into the transaction. So in the case of an unrelated form error, we don't have to select the file and reload it.
+ *
+ * In the case of an unsuccessful error or a deleted file, value == Null.
  *
  * @author Martin Takáč <martin@takac.name>
  */
-class MultiFileControl extends BaseControl
+class MultiFileControl extends NetteUploadControl
 {
-
-	const PRELOAD_BUTTON = '__taco_preload';
-
-	/**
-	 * List of existing uploaded files.
-	 * @var array<mixed>
-	 */
-	private $uploaded = array();
-
-
-	/**
-	 * List of existing uploaded files to delete.
-	 * @var array<mixed>
-	 */
-	private $remove = array();
-
-
-	/**
-	 * A list of existing uploaded files that have not yet been logged into the system.
-	 * @var array<mixed>
-	 */
-	private $uploading = array();
-
-
-	/**
-	 * Helper for formating mime type class representation uploaded file.
-	 * @var function
-	 */
-	private $parseType;
 
 	/**
 	 * A repository holding uploaded files before they are actually saved.
@@ -62,22 +41,78 @@ class MultiFileControl extends BaseControl
 	 */
 	private $store;
 
+	/**
+	 * @var ?FilePreviewer
+	 */
+	private $previewer = Null;
+
+	/**
+	 * @var Html
+	 */
+	private $container;
+
+	/**
+	 * @var Html
+	 */
+	private $itemControl;
+
+	/**
+	 * @var Html
+	 */
+	private $useCheckbox;
+
+	/**
+	 * @var Html  current file template
+	 */
+	private $currentControl;
+
+	/**
+	 * @var Html
+	 */
+	private $previewControl;
+
+	/**
+	 * @var Html
+	 */
+	private $transactionControl;
+
+	/**
+	 * @var Html
+	 */
+	private $preloadButton;
+
 
 	function __construct(string|Stringable|null $label = null, UploadStore $store = Null)
 	{
 		parent::__construct($label);
-		$this->control = Html::el('ul', array(
-			'class' => 'file-uploader',
-			'data-type' => 'file-uploader',
-		));
-		$this->parseType = function ($s) {
-			if (empty($s)) {
-				return $s;
-			}
-
-			$p = explode('/', $s, 2);
-			return $p[0];
-		};
+		$this->container = Html::el('div', [
+			'data-taco-type' => 'file',
+			'class' => 'taco-file-control taco-multifile-control',
+			//~ 'style' => 'border: 1px solid red',
+		]);
+		$this->itemControl = Html::el('div', [
+			//~ 'style' => 'border: 1px solid green',
+		]);
+		$this->useCheckbox = Html::el('input', [
+			'type' => 'checkbox',
+			'checked' => True,
+			'formnovalidate' => '',
+		]);
+		$this->currentControl = Html::el('input', [
+			'readonly' => 1,
+			'style' => 'display: none',
+		]);
+		$this->previewControl = Html::el('input', [
+			'readonly' => 1,
+		]);
+		$this->transactionControl = Html::el('input', [
+			'type' => 'hidden',
+		]);
+		$this->preloadButton = Html::el('input', [
+			'type' => 'submit',
+			'value' => $this->translate('Preload'),
+			'formnovalidate' => '',
+		]);
 
 		$this->store = (!empty($store)) ? $store : new UploadStoreTemp();
 
@@ -86,22 +121,19 @@ class MultiFileControl extends BaseControl
 				throw new Nette\InvalidStateException('File upload requires method POST.');
 			}
 			$form->getElementPrototype()->enctype = 'multipart/form-data';
-			if ( ! isset($form[self::PRELOAD_BUTTON])) {
-				$form->addSubmit(self::PRELOAD_BUTTON, 'Preload')->setValidationScope([]);
-			}
 		});
 	}
 
 
 
 	/**
-	 * Set function for formating mime type class representation uploaded file.
-	 *
-	 * @param function
+	 * By setting the previewer, uploaded files will be represented by their respective previews.
+	 * @return self
 	 */
-	function setMimeTypeClassFunction($fce)
+	function setPreviewer(FilePreviewer $var)
 	{
-		$this->parseType = $fce;
+		$this->previewer = $var;
+		return $this;
 	}
 
 
@@ -109,15 +141,16 @@ class MultiFileControl extends BaseControl
 	/**
 	 * Set control's values.
 	 *
-	 * @param array of Taco\Nette\Forms\Controls\File $values
+	 * @param array<mixed> $values
 	 */
 	function setValue($values)
 	{
-		$this->value = array();
+		$this->value = [];
 		if ($values && is_array($values)) {
-			foreach ($values as $value) {
-				$this->value[] = self::assertUploadesFile($value)->setCommited(True);
+			foreach ($values as $x) {
+				self::assertFileValue($x);
 			}
+			$this->value = $values;
 		}
 		return $this;
 	}
@@ -126,11 +159,11 @@ class MultiFileControl extends BaseControl
 
 	/**
 	 * Returning values.
-	 * @return array of Taco\Nette\Http\FileUploaded | Nette\Http\FileUpload
+	 * @return array<FileUploaded|FileCurrent>
 	 */
 	function getValue()
 	{
-		return array_merge($this->uploaded, $this->remove, (array)$this->value);
+		return (array) $this->value;
 	}
 
 
@@ -142,55 +175,46 @@ class MultiFileControl extends BaseControl
 	 */
 	function loadHttpData() : void
 	{
-		$this->value = array();
+		// When I add a new Upload to the running request, the transaction number is missing
+		$this->store->setId($this->getHttpData(Form::DataLine, '[transaction]'));
 
-		$this->store->setId($this->getHttpData(Form::DATA_LINE, '[transaction]'));
+		// Odškrtnutí znamená vyhodit.
+		$used = $this->getHttpData(Form::DataLine, '[use][]');
 
-		$newfiles = $this->getHttpData(Form::DATA_FILE, '[new][]');
-
-		$uploadedFiles = $this->getHttpData(Form::DATA_LINE, '[uploaded][files][]');
-		$uploadedRemove = $this->getHttpData(Form::DATA_LINE, '[uploaded][remove][]');
-
-		$uploadingFiles = $this->getHttpData(Form::DATA_LINE, '[uploading][files][]');
-		$uploadingRemove = $this->getHttpData(Form::DATA_LINE, '[uploading][remove][]');
-
-		// Promazávání existujících.
-		$this->uploaded = array();
-		foreach ($uploadedFiles as $item) {
-			$file = self::createFileUploadedFromValue($item);
-			$file->setCommited(True);
-			if (in_array($item, $uploadedRemove)) {
-				$file->setRemove(True);
-			}
-			$this->value[] = $file;
-		}
-
-		// Promazávání transakce.
-		foreach ($uploadingFiles as $item) {
-			list(, $filename) = explode('#', $item, 2);
-			if ( ! in_array($item, $uploadingRemove) && $this->store->exists($filename)) {
-				$file = self::createFileUploadedFromValue($item);
-				$file->setCommited(False);
-				$this->value[] = $file;
+		$values = [];
+		if ($rawvalues = $this->getHttpData(Form::DataText, '[current][]')) {
+			foreach ($rawvalues as $rawvalue) {
+				if (!in_array($rawvalue, $used, True)) {
+					continue;
+				}
+				$value = Utils::createFileUploadedFromValue($rawvalue);
+				// If it's in the store, it's not committed. How else would he get here?
+				if ($this->store->exists($value->getId())) {
+					$values[] = $value;
+				}
+				else {
+					$values[] = Utils::createFileCurrentFromValue($rawvalue);
+				}
 			}
 		}
 
 		// Ty, co přišli v pořádku, tak uložit do transakce, co nejsou v pořádku zahodit a oznámit neuspěch.
-		foreach ($newfiles as $file) {
-			if ($file->isOk()) {
-				$this->value[] = $this->store->append($file);
-			}
-			else {
-				$this->addError(self::formatError($file));
+		if ($files = $this->getHttpData(Form::DataFile, '[new][]')) {
+			foreach ($files as $file) {
+				if ($file->isOk()) {
+					$values[] = $this->store->append($file);
+				}
+				else {
+					$this->addError($this->translate(Utils::formatError($file)));
+				}
 			}
 		}
-	}
 
+		$this->value = $values;
 
-
-	function handlePreload()
-	{
-		// @TODO
+		if ($this->getHttpData(Form::DataLine, '[preload]')) {
+			$this->form->setSubmittedBy((new SubmitButton())->setValidationScope([]));
+		}
 	}
 
 
@@ -203,56 +227,124 @@ class MultiFileControl extends BaseControl
 	function getControl()
 	{
 		$name = $this->getHtmlName();
-
-		$container = clone $this->control;
-		//~ $container->setAttribute('data-preload-handle', $this->link('preload!'));
-		$parseTypeFunction = $this->parseType;
-
-		// Prvky nahrané už někde na druhé straně
+		$container = clone $this->container;
 		foreach ($this->value as $item) {
-			if ($item->isCommited()) {
-				$section = 'uploaded';
-			}
-			else {
-				$section = 'uploading';
-			}
-
-			$container
-				->addHtml(Html::el('li', array('class' => "file {$section}-file"))
-					->addHtml(Html::el('input', array(
-						'type' => 'hidden',
-						'value' => self::formatValue($item),
-						'name' => "{$name}[{$section}][files][]",
-					)))
-					->addHtml(Html::el('input', array(
-						'type' => 'checkbox',
-						'checked' => ($item->isRemove()),
-						'value' => self::formatValue($item),
-						'name' => "{$name}[{$section}][remove][]",
-						'title' => strtr('Remove file: %{name}', array(
-							'%{name}' => $item->getName()
-						)),
-					)))
-					->addHtml(Html::el('span', array(
-						'class' => array('file', $parseTypeFunction($item->getContentType())),
-					))->setText($item->getName()))
-				);
+			$container->addHtml($this->getItemControlPart($name, $item));
 		}
+		$container->addHtml($this->getItemControlPart($name, Null));
+		$container->addHtml($this->getPreloadButtonPart($name));
+		$container->addHtml($this->getTransactionControlPart($name));
 
-		// Nový prvek
-		return $container
-			->addHtml(Html::el('li', array('class' => 'file new-file'))
-				->addHtml(Html::el('input', array(
-					'type' => 'file',
-					'name' => $name . '[new][]',
-					'multiple' => True,
-				)))
-				->addHtml(Html::el('input', array(
-					'type' => 'hidden',
-					'name' => $name . '[transaction]',
-					'value' => $this->store->getId(),
-				)))
-			);
+		return $container;
+	}
+
+
+
+	private function getItemControlPart(string $name, FileUploaded|FileCurrent|Null $value): Html
+	{
+		$el = clone $this->itemControl;
+		if (empty($value)) {
+			$el->addHtml($this->getNewControlPart($name, withoutRequired: False));
+		}
+		else {
+			$el->addHtml($this->getUseCheckboxPart($name, $value));
+			$el->addHtml($this->getCurrentPart($name, $value));
+			$el->addHtml($this->getPreviewControlPart($value));
+		}
+		return $el;
+	}
+
+
+
+	function getCurrentPart(string $name, FileUploaded|FileCurrent $value): Html
+	{
+		$el = clone $this->currentControl;
+		$el->value = Utils::serializeFile($value);
+		$el->name = $name . '[current][]';
+		return $el;
+	}
+
+
+
+	function getPreviewControlPart(FileUploaded|FileCurrent $src): Html
+	{
+		if (empty($this->previewer)) {
+			$el = clone $this->previewControl;
+			$el->value = $src->getName();
+			return $el;
+		}
+		return $this->previewer->getPreviewControlFor($src);
+	}
+
+
+
+	function getUseCheckboxPart(string $name, FileUploaded|FileCurrent $src): Html
+	{
+		$el = clone $this->useCheckbox;
+		$el->name = $name . '[use][]';
+		$el->value = Utils::serializeFile($src);
+		return $el;
+	}
+
+
+
+	private function getNewControlPart(string $name, bool $withoutRequired): Html
+	{
+		$el = parent::getControl();
+		if (!$el instanceof Html) {
+			throw new LogicException("Expected only Html type.");
+		}
+		$el = clone $el;
+		$el->name = $name . '[new][]';
+		$el->multiple = True;
+		// Existenci validujeme podle $name[current], ale nový záznam podle $name[new].
+		if ($withoutRequired) {
+			unset($el->required);
+			$el->setAttribute('data-nette-rules', Utils::removeFilledRules($el->getAttribute('data-nette-rules')));
+		}
+		return $el;
+	}
+
+
+
+	function getPreloadButtonPart(string $name): Html
+	{
+		$el = clone $this->preloadButton;
+		$el->name = $name . '[preload]';
+		return $el;
+	}
+
+
+
+	private function getTransactionControlPart(string $name): Html
+	{
+		$el = clone $this->transactionControl;
+		$el->name = $name . '[transaction]';
+		$el->value = (string) $this->store->getId();
+		return $el;
+	}
+
+
+
+	/**
+	 * Have been all files successfully uploaded?
+	 */
+	function isOk(): bool
+	{
+		return True;
+	}
+
+
+
+	/**
+	 * Has been any file uploaded?
+	 */
+	function isFilled(): bool
+	{
+		if (empty($this->value)) {
+			return False;
+		}
+		return True;
 	}
 
 
@@ -260,95 +352,14 @@ class MultiFileControl extends BaseControl
 	/**
 	 * Odstranění adresáře s transakcí.
 	 */
-	function destroy()
+	function destroyStore(): void
 	{
 		$this->store->destroy();
-		$this->uploading = array();
-		foreach ($this->value as $i => $x) {
-			if ( ! $x->isCommited()) {
-				unset($this->value[$i]);
-			}
-		}
 	}
 
 
-	private static function assertUploadesFile(FileUploaded $value)
+
+	private static function assertFileValue(FileCurrent $m): void
 	{
-		return $value;
 	}
-
-
-
-	/**
-	 * @param string $s 'image/jpeg'
-	 * @return string 'image'
-	 */
-	private static function parseType($s)
-	{
-		if (empty($s)) {
-			return $s;
-		}
-
-		$p = explode('/', $s, 2);
-		return $p[0];
-	}
-
-
-
-	/**
-	 * @param FileUploaded $s
-	 * @return string 'image'
-	 */
-	private static function formatValue($s)
-	{
-		return $s->getContentType() . '#' . $s->getPath();
-	}
-
-
-
-	private static function formatError(FileUpload $file): string
-	{
-		switch ($file->error) {
-			case UPLOAD_ERR_OK:
-				throw LogicException('No error.');
-			case UPLOAD_ERR_INI_SIZE:
-				$message = "The uploaded file exceeds the upload_max_filesize directive in php.ini";
-				break;
-			case UPLOAD_ERR_FORM_SIZE:
-				$message = "The uploaded file exceeds the MAX_FILE_SIZE directive that was specified in the HTML form";
-				break;
-			case UPLOAD_ERR_PARTIAL:
-				$message = "The uploaded file was only partially uploaded";
-				break;
-			case UPLOAD_ERR_NO_FILE:
-				$message = "No file was uploaded";
-				break;
-			case UPLOAD_ERR_NO_TMP_DIR:
-				$message = "Missing a temporary folder";
-				break;
-			case UPLOAD_ERR_CANT_WRITE:
-				$message = "Failed to write file to disk";
-				break;
-			case UPLOAD_ERR_EXTENSION:
-				$message = "File upload stopped by extension";
-				break;
-			default:
-				$message = "Unknown upload error";
-				break;
-		}
-
-		return "{$file->name}: {$message}";
-	}
-
-
-
-	/**
-	 * @param string $s 'image/jpeg#tasks/6s3qva8l/4728-05.jpg'
-	 */
-	private static function createFileUploadedFromValue($s): FileUploaded
-	{
-		$s = explode('#', $s, 2);
-		return new FileUploaded($s[1], $s[0]);
-	}
-
 }
