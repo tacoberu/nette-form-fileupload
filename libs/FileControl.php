@@ -312,13 +312,7 @@ class FileControl extends NetteUploadControl
 		// Existenci validujeme podle $name[current], ale nový záznam podle $name[new].
 		if ($withoutRequired) {
 			unset($el->required);
-			$netteRules = $el->{'data-nette-rules'};
-			foreach ($netteRules as $i => $x) {
-				if ($x['op'] === Form::Filled) {
-					unset($netteRules[$i]);
-				}
-			}
-			$el->setAttribute('data-nette-rules', array_values($netteRules));
+			$el->setAttribute('data-nette-rules', self::removeFilledRules($el->{'data-nette-rules'}));
 		}
 		return $el;
 	}
@@ -352,6 +346,21 @@ class FileControl extends NetteUploadControl
 	{
 		list($type, $path) = explode('#', $src, 2);
 		return new FileUploaded($path, $type);
+	}
+
+
+
+	private static function removeFilledRules(array $xs): array
+	{
+		foreach ($xs as $i => $x) {
+			if ($x['op'] === Form::Filled) {
+				unset($xs[$i]);
+			}
+			elseif (isset($x['rules'])) {
+				$xs[$i]['rules'] = self::removeFilledRules($x['rules']);
+			}
+		}
+		return array_values($xs);
 	}
 
 
