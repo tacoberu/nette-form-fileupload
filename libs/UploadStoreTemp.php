@@ -9,9 +9,10 @@ namespace Taco\Nette\Forms\Controls;
 use Nette,
 	Nette\Utils\Validators,
 	Nette\Http\FileUpload;
-use Taco\Nette\Http\FileUploaded;
-use RuntimeException, LogicException;
+use RuntimeException;
+use LogicException;
 use Stringable;
+use SplFileInfo;
 
 
 /**
@@ -35,6 +36,7 @@ class UploadStoreTemp implements UploadStore
 
 	/**
 	 * "/tmp/upload-669932181976"
+	 * @var string
 	 */
 	private $prefix = self::PREFIX;
 
@@ -68,6 +70,7 @@ class UploadStoreTemp implements UploadStore
 	{
 		Validators::assert($id, 'numeric:1..');
 		$this->id = (int)$id;
+		return $this;
 	}
 
 
@@ -118,7 +121,7 @@ class UploadStoreTemp implements UploadStore
 
 
 	/**
-	 * @return array
+	 * @return array<string>
 	 */
 	private function baseDir()
 	{
@@ -129,6 +132,7 @@ class UploadStoreTemp implements UploadStore
 
 	/**
 	 * Deletes a file or directory.
+	 * @param string $path
 	 * @return void
 	 * @throws RuntimeException
 	 */
@@ -144,7 +148,7 @@ class UploadStoreTemp implements UploadStore
 		}
 		elseif (is_dir($path)) {
 			foreach (new \FilesystemIterator($path) as $item) {
-				static::delete($item->getPathname());
+				self::delete((string) $item);
 			}
 
 			// @ is escalated to exception

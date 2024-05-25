@@ -7,7 +7,6 @@
 namespace Taco\Nette\Forms\Controls;
 
 use Nette\Http\FileUpload;
-use Taco\Nette\Http\FileUploaded;
 
 
 /**
@@ -18,7 +17,8 @@ interface UploadStore
 
 	/**
 	 * The unique identifier under which the transaction is registered.
-	 * @param int
+	 * @param int $id
+	 * @return static
 	 */
 	function setId($id);
 
@@ -33,7 +33,7 @@ interface UploadStore
 
 
 	/**
-	 * @param string Filename of uploaded file.
+	 * @param string $filename Filename of uploaded file.
 	 * @return bool
 	 */
 	function exists($filename);

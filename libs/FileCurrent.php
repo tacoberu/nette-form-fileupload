@@ -10,11 +10,11 @@ use Nette;
 
 
 /**
- * Recorded, or file being recorded.
+ * Původní soubor, který je již uložený v systému. V případě nahrazení bude nahrazen novým souborem typu FileUploaded.
  *
  * @author Martin Takáč <martin@takac.name>
  */
-class FileUploaded
+class FileCurrent
 {
 
 	use Nette\SmartObject;

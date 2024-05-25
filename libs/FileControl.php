@@ -13,7 +13,6 @@ use Nette\Http\FileUpload;
 use Nette\Utils\Html;
 use Stringable;
 use LogicException;
-use Taco\Nette\Http\FileUploaded;
 
 
 /**
@@ -40,9 +39,9 @@ class FileControl extends NetteUploadControl
 	private $store;
 
 	/**
-	 * @var FilePreviewer
+	 * @var ?FilePreviewer
 	 */
-	private $previewer;
+	private $previewer = Null;
 
 	/**
 	 * @var Html
@@ -100,6 +99,7 @@ class FileControl extends NetteUploadControl
 
 	/**
 	 * By setting the previewer, uploaded files will be represented by their respective previews.
+	 * @return self
 	 */
 	function setPreviewer(FilePreviewer $var)
 	{
@@ -124,14 +124,19 @@ class FileControl extends NetteUploadControl
 				$this->value = $this->store->append($file);
 			}
 			else {
-				$this->addError($this->translate(self::formatError($file)));
+				$this->addError($this->translate(Utils::formatError($file)));
 				$this->value = Null;
 			}
 		}
-		elseif ($value = $this->getHttpData(Form::DataText, '[current]')) {
-			$this->value = self::createFileUploadedFromValue($value);
+		elseif ($rawvalue = $this->getHttpData(Form::DataText, '[current]')) {
+			$value = Utils::createFileUploadedFromValue($rawvalue);
 			// If it's in the store, it's not committed. How else would he get here?
-			$this->value->setCommited(! $this->store->exists($this->value->getId()));
+			if ($this->store->exists($value->getId())) {
+				$this->value = $value;
+			}
+			else {
+				$this->value = Utils::createFileCurrentFromValue($rawvalue);
+			}
 		}
 		else {
 			$this->value = null;
@@ -168,36 +173,22 @@ class FileControl extends NetteUploadControl
 
 
 
-	function validate(): void
-	{
-		if ($this->value instanceof CurrentFileUploadValue) {
-			return;
-		}
-		parent::validate();
-	}
-
-
-
 	/**
 	 * @return static
 	 */
 	function setValue($value)
 	{
-		if ($value instanceof FileUpload) {
-			dump($value);
-			die("\n------\n" . __file__ . ':' . __line__ . "\n");
+		if ($value instanceof FileCurrent) {
+			$this->value = clone $value;
 		}
 		elseif ($value instanceof FileUploaded) {
-			$value = clone $value;
-			$value->setCommited(True);
-			$this->value = $value;
+			$this->value = clone $value;
 		}
 		elseif (empty($value)) {
 			$this->value = Null;
 		}
 		else {
-			dump($value);
-			die("\n------\n" . __file__ . ':' . __line__ . "\n");
+			throw new LogicException("Unexpected value.");
 		}
 		return $this;
 	}
@@ -210,11 +201,14 @@ class FileControl extends NetteUploadControl
 	function getControl()
 	{
 		switch (True) {
+			// Existující soubor
+			case $this->value instanceof FileCurrent:
 			// Some file in the transaction.
 			// The second round of the form
 			case $this->value instanceof FileUploaded:
 				$name = $this->getHtmlName();
-				return $this->container
+				$container = clone $this->container;
+				return $container
 					->addHtml($this->getCurrentPart($name, $this->value))
 					->addHtml($this->getPreviewControlPart($this->value))
 					->addHtml($this->getRemoveButtonPart($name))
@@ -226,7 +220,8 @@ class FileControl extends NetteUploadControl
 			// The first round of the form
 			case empty($this->value):
 				$name = $this->getHtmlName();
-				return $this->container
+				$container = clone $this->container;
+				return $container
 					->addHtml($this->getNewControlPart($name, withoutRequired: False))
 					->addHtml($this->getTransactionControlPart($name));
 
@@ -276,10 +271,10 @@ class FileControl extends NetteUploadControl
 
 
 
-	function getCurrentPart(string $name, FileUploaded $value): Html
+	function getCurrentPart(string $name, FileUploaded|FileCurrent $value): Html
 	{
 		$el = clone $this->currentControl;
-		$el->value = self::serializeFile($value);
+		$el->value = Utils::serializeFile($value);
 		$el->name = $name . '[current]';
 		return $el;
 	}
@@ -293,7 +288,7 @@ class FileControl extends NetteUploadControl
 
 
 
-	function getPreviewControlPart(FileUploaded $src): Html
+	function getPreviewControlPart(FileUploaded|FileCurrent $src): Html
 	{
 		if (empty($this->previewer)) {
 			$el = clone $this->previewControl;
@@ -307,12 +302,16 @@ class FileControl extends NetteUploadControl
 
 	private function getNewControlPart(string $name, bool $withoutRequired): Html
 	{
-		$el = clone parent::getControl();
+		$el = parent::getControl();
+		if (!$el instanceof Html) {
+			throw new LogicException("Expected only Html type.");
+		}
+		$el = clone $el;
 		$el->name = $name . '[new]';
 		// Existenci validujeme podle $name[current], ale nový záznam podle $name[new].
 		if ($withoutRequired) {
 			unset($el->required);
-			$el->setAttribute('data-nette-rules', self::removeFilledRules($el->{'data-nette-rules'}));
+			$el->setAttribute('data-nette-rules', Utils::removeFilledRules($el->getAttribute('data-nette-rules')));
 		}
 		return $el;
 	}
@@ -323,80 +322,8 @@ class FileControl extends NetteUploadControl
 	{
 		$el = clone $this->transactionControl;
 		$el->name = $name . '[transaction]';
-		$el->value = $this->store->getId();
+		$el->value = (string) $this->store->getId();
 		return $el;
-	}
-
-
-
-	/**
-	 * @return string 'image/jpeg#tasks/6s3qva8l/4728-05.jpg'
-	 */
-	private static function serializeFile(FileUploaded $src): string
-	{
-		return $src->getContentType() . '#' . $src->getId();
-	}
-
-
-
-	/**
-	 * @param string $src 'image/jpeg#tasks/6s3qva8l/4728-05.jpg'
-	 */
-	private static function createFileUploadedFromValue(string $src): FileUploaded
-	{
-		list($type, $path) = explode('#', $src, 2);
-		return new FileUploaded($path, $type);
-	}
-
-
-
-	private static function removeFilledRules(array $xs): array
-	{
-		foreach ($xs as $i => $x) {
-			if ($x['op'] === Form::Filled) {
-				unset($xs[$i]);
-			}
-			elseif (isset($x['rules'])) {
-				$xs[$i]['rules'] = self::removeFilledRules($x['rules']);
-			}
-		}
-		return array_values($xs);
-	}
-
-
-
-	private static function formatError(FileUploaded $file): string
-	{
-		switch ($file->error) {
-			case UPLOAD_ERR_OK:
-				throw LogicException('No error.');
-			case UPLOAD_ERR_INI_SIZE:
-				$message = "The uploaded file exceeds the upload_max_filesize directive in php.ini";
-				break;
-			case UPLOAD_ERR_FORM_SIZE:
-				$message = "The uploaded file exceeds the MAX_FILE_SIZE directive that was specified in the HTML form";
-				break;
-			case UPLOAD_ERR_PARTIAL:
-				$message = "The uploaded file was only partially uploaded";
-				break;
-			case UPLOAD_ERR_NO_FILE:
-				$message = "No file was uploaded";
-				break;
-			case UPLOAD_ERR_NO_TMP_DIR:
-				$message = "Missing a temporary folder";
-				break;
-			case UPLOAD_ERR_CANT_WRITE:
-				$message = "Failed to write file to disk";
-				break;
-			case UPLOAD_ERR_EXTENSION:
-				$message = "File upload stopped by extension";
-				break;
-			default:
-				$message = "Unknown upload error";
-				break;
-		}
-
-		return "{$file->name}: {$message}";
 	}
 
 }

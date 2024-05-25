@@ -47,7 +47,7 @@ class GenericFilePreviewer implements FilePreviewer
 	private $format = ImageType::JPEG;
 
 
-	function getPreviewControlFor(FileUploaded $val): Html
+	function getPreviewControlFor(FileUploaded|FileCurrent $val): Html
 	{
 		if (self::isImageTypeByFilename($val->getId())) {
 			$image = Image::fromFile($val->getId());

@@ -17,6 +17,6 @@ use Nette\Utils\Html;
 interface FilePreviewer
 {
 
-	function getPreviewControlFor(FileUploaded $val): Html;
+	function getPreviewControlFor(FileUploaded|FileCurrent $val): Html;
 
 }
