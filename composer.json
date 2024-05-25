@@ -1,11 +1,12 @@
 {
 	"name": "tacoberu/nette-form-fileupload",
-	"description": "The option to upload and the option to display an already existing file.",
+	"description": "Uploading files has its specifics. It is not enough just to upload the file. We also want to show it when it's already uploaded (preferably with a preview). We want to possibly delete it or replace it with another version.",
 	"type": "library",
 	"license": "MIT",
 	"keywords": [
 		"nette",
 		"form",
+		"file",
 		"fileupload"
 	],
 	"require": {
