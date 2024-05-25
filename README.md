@@ -42,3 +42,28 @@ $form['portrait'] = (new FileControl('Portrait:'))
 
 
 ```
+
+
+### Transactions
+
+When the file is successfully uploaded to the server, it is automatically moved to the storage, transaction. This will serve to
+if the form is not processed, but is, for example, passed back to the user for validation reasons, it is not necessary to upload the file again.
+After successful processing, the file is available using $control->getValue() like the other values.
+
+After the file is uploaded to the system, the transaction can be discarded. Well, in case
+using the default storage `UploadStoreTemp`, delete the directory. We can either do this explicitly:
+
+```php
+$form['portrait']->destroyStore();
+```
+
+Or leave it to the GC, which will delete it automatically after a certain period of time.
+
+#### UploadStoreTemp, GC
+
+Automatic greasing is implemented in `UploadStoreTemp`. it acts like
+that after the page exits, all relevant transactions are passed through the destructor
+and checks if the transaction is older than `UploadStoreTemp::$gcAgeLimit`.
+This only deletes `UploadStoreTemp::$gcMaxCount` transactions/directories to spread the load.
+
+This behavior is only a matter of the `UploadStoreTemp` implementation.

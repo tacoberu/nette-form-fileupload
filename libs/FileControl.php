@@ -174,6 +174,16 @@ class FileControl extends NetteUploadControl
 
 
 	/**
+	 * Explicitní vymazání transakce.
+	 */
+	function destroyStore(): void
+	{
+		$this->store->destroy();
+	}
+
+
+
+	/**
 	 * @return static
 	 */
 	function setValue($value)

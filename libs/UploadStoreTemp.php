@@ -8,15 +8,14 @@ namespace Taco\Nette\Forms\Controls;
 
 use Nette,
 	Nette\Utils\Validators,
+	Nette\Utils\Strings,
 	Nette\Http\FileUpload;
 use RuntimeException;
-use LogicException;
-use Stringable;
-use SplFileInfo;
 
 
 /**
- * A repository holding uploaded files before they are actually saved. In this case it will just be a different directory.
+ * A repository holding uploaded files before they are actually saved. In this
+ * case it will just be a different directory.
  */
 class UploadStoreTemp implements UploadStore
 {
@@ -40,19 +39,52 @@ class UploadStoreTemp implements UploadStore
 	 */
 	private $prefix = self::PREFIX;
 
-
 	/**
 	 * The unique identifier under which the transaction is registered.
 	 * @var int
 	 */
 	private $id;
 
+	/**
+	 * @var ?string
+	 */
+	private $baseDir;
+
+	/**
+	 * 60 = minute
+	 * @var int
+	 */
+	private $gcLimit;
+
+	/**
+	 * @var int
+	 */
+	private $gcMaxCount;
+
+
+	/**
+	 * In sec
+	 */
+	static function calculateAgeOfId(int $id): int
+	{
+		return (int) ((self::generateId() - $id) / 10000);
+	}
+
+
 
 	/**
 	 * @param string $prefix A string to prefix the directory for storing files.
 	 * @param int $id The identifier of an existing transaction. If not specified, a unique one is generated.
+	 * @param string $baseDir Umístění úložiště. Null = sys_get_temp_dir()
+	 * @param int $gcAgeLimit How old must a transaction be to be deleted.
+	 * @param int $gcMaxCount Maximum number of transactions to delete. In order to spread the load over time.
 	 */
-	function __construct($prefix = Null, $id = Null)
+	function __construct($prefix = Null
+		, $id = Null
+		, ?string $baseDir = Null
+		, int $gcAgeLimit = 60 * 60 * 24 * 3
+		, int $gcMaxCount = 5
+		)
 	{
 		if ($prefix) {
 			Validators::assert($prefix, 'string:1..');
@@ -62,6 +94,9 @@ class UploadStoreTemp implements UploadStore
 		if ($id) {
 			$this->setId($id);
 		}
+		$this->baseDir = $baseDir;
+		$this->gcLimit = $gcAgeLimit;
+		$this->gcMaxCount = $gcMaxCount;
 	}
 
 
@@ -78,7 +113,7 @@ class UploadStoreTemp implements UploadStore
 	function getId()
 	{
 		if (empty($this->id)) {
-			$this->id = (int) (microtime(True) * 10000) - self::EPOCH_START;
+			$this->id = self::generateId();
 		}
 		return $this->id;
 	}
@@ -94,7 +129,7 @@ class UploadStoreTemp implements UploadStore
 
 	function append(FileUpload $file)
 	{
-		$path = $this->baseDir();
+		$path = $this->getTransactionDir();
 		$path[] = $file->sanitizedName;
 		$path = implode(DIRECTORY_SEPARATOR, $path);
 
@@ -112,7 +147,7 @@ class UploadStoreTemp implements UploadStore
 
 	function destroy()
 	{
-		$dir = implode(DIRECTORY_SEPARATOR, $this->baseDir());
+		$dir = implode(DIRECTORY_SEPARATOR, $this->getTransactionDir());
 		if (file_exists($dir)) {
 			self::delete($dir);
 		}
@@ -121,11 +156,63 @@ class UploadStoreTemp implements UploadStore
 
 
 	/**
+	 * It will serve as a GC for erasing old records.
+	 */
+	function __destruct()
+	{
+		if (empty($this->gcLimit)) {
+			return;
+		}
+		$path = implode('/', array_merge([$this->getBaseDir()], array_slice(explode('/', $this->prefix), 0, -1)));
+		$pathWithPrefix = $this->getBaseDir() . DIRECTORY_SEPARATOR . $this->prefix;
+		$count = $this->gcMaxCount;
+		foreach (new \FilesystemIterator($path) as $item) {
+			if (Strings::startsWith($item, $pathWithPrefix)) {
+				if ($count-- < 0) {
+					break;
+				}
+				$id = (int) substr($item, strlen($pathWithPrefix));
+				if ($id != $this->id && $this->itIsOld($id)) {
+					self::delete($item);
+				}
+			}
+		}
+	}
+
+
+
+	private function itIsOld(int $id): bool
+	{
+		return self::calculateAgeOfId($id) > $this->gcLimit;
+	}
+
+
+
+	/**
 	 * @return array<string>
 	 */
-	private function baseDir()
+	private function getTransactionDir()
 	{
-		return array(sys_get_temp_dir(), $this->prefix . $this->getId());
+		return [$this->getBaseDir()
+			, $this->prefix . $this->getId()
+		];
+	}
+
+
+
+	/**
+	 * @return string
+	 */
+	private function getBaseDir()
+	{
+		return $this->baseDir ?: sys_get_temp_dir();
+	}
+
+
+
+	private static function generateId(): int
+	{
+		return (int) (microtime(True) * 10000) - self::EPOCH_START;
 	}
 
 
