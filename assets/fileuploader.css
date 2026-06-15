@@ -1,0 +1,56 @@
+ul.file-uploader {
+    border: 1px solid darkgrey;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+ul.file-uploader li {
+    margin: 0;
+    padding: .2em .5em;
+    border-bottom: 1px solid lightgrey;
+}
+ul.file-uploader li:last-child {
+    border-bottom: 0 none;
+}
+ul.file-uploader li input[type="checkbox"] {
+    margin-right: 1.8em;
+    cursor: pointer;
+    width: 0;
+}
+ul.file-uploader li input[type="checkbox"]:after {
+    content: "×";
+    color: red;
+    font-weight: bold;
+    font-size: larger;
+    padding: 3px 5px 2px 6px;
+    background-color: #e5e5e5;
+    border: 1px solid #aaa;
+    border-radius: 2px;
+}
+div.taco-multifile-control > div.taco-file-control-item {
+    border: 1px solid darkgrey;
+    padding: .2em .5em;
+}
+
+div.taco-multifile-control > div.taco-file-control-item label {
+    border: 1px solid darkgrey;
+    display: inline-block;
+    width: 2rem;
+}
+
+div.taco-multifile-control > div.taco-file-control-item > label input[type="checkbox"] {
+    margin-right: 1.8em;
+    cursor: pointer;
+}
+/*
+div.taco-multifile-control > div > label input[type="checkbox"]:after {
+    content: "×";
+    color: red;
+    font-weight: bold;
+    font-size: larger;
+    padding: 3px 5px 2px 6px;
+    background-color: #e5e5e5;
+    border: 1px solid #aaa;
+    border-radius: 2px;
+}
+*/
