@@ -11,13 +11,18 @@
 	],
 	"require": {
 		"php" : ">=8.1",
-		"nette/forms": "~3.1"
+		"nette/forms": "~3.1.0"
 	},
 	"require-dev": {
 		"phpstan/phpstan": "^1.10",
 		"phpunit/phpunit": "^10.0",
 		"slevomat/coding-standard": "^8.29",
-		"rector/rector": "^1.0"
+		"rector/rector": "^1.0",
+		"nette/application": "*",
+		"nette/di": "*",
+		"nette/bootstrap": "*",
+		"tracy/tracy": "*",
+		"latte/latte": "*"
 	},
 	"autoload": {
 		"classmap": ["libs"]
