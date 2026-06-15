@@ -1,0 +1,7 @@
+parameters:
+	database:
+		# postgresql
+		# sqlite
+		dsn: 'sqlite:%appDir%/../../var/blog.sqlite3'
+		options:
+			lazy: yes

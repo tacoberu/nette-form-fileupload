@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta n:ifset="$robots" name="robots" content="{$robots}" />
+	<meta name="viewport" content="width=device-width" />
+
+	<title>{block title|striptags|trim}{/block} | Nette example</title>
+
+	<link rel="stylesheet" media="screen" href="{$basePath}/css/filecontrol.css" />
+	<link rel="stylesheet" media="screen" href="{$basePath}/css/site.css" />
+</head>
+
+<body>
+	<div n:foreach="$flashes as $flash" class="flash {$flash->type}">{$flash->message}</div>
+
+	<div id="content" class="container">
+		{include content}
+	</div>
+
+	<script src="https://code.jquery.com/jquery-3.7.1.js"></script>
+	<script src="{$basePath}/js/netteForms.min.js"></script>
+	<script src="{$basePath}/js/netteAjax.js"></script>
+	{* <script src="{$basePath}/js/jquery.filePreuploader.js"></script> *}
+	<script type="text/javascript">
+		$(function() {
+			$(function () {
+				/*
+				$('[data-type="file-uploader"]').filePreuploader({
+					spinnerUrl: 'ab',
+					autoSubmitBy: 'input[name="__taco_preload"]'
+				});
+				*/
+
+				$.nette.init();
+			});
+		});
+	</script>
+</body>
+</html>
