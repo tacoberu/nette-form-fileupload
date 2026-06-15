@@ -9,6 +9,7 @@ namespace Taco\Nette\Forms\Controls;
 
 use Nette\Utils\Html;
 use Nette\Utils\Image;
+use Nette\Utils\ImageException;
 use Nette\Utils\ImageType;
 
 
@@ -43,24 +44,44 @@ class GenericFilePreviewer implements FilePreviewer
 	/**
 	 * @var 1|2|3|6|18|19
 	 */
-	private $format = ImageType::JPEG;
+	private int $format = ImageType::JPEG;
 
-	function getPreviewControlFor(FileUploaded|FileCurrent $val): Html
+	function getPreviewControlFor(FileUploaded | FileCurrent $val): Html
 	{
-		if (self::isImageTypeByFilename($val->getId())) {
-			$image = Image::fromFile($val->getId());
-			$image->resize($this->width, $this->height, $this->flag);
-			$content = $image->toString($this->format, $this->quality);
-		}
-		else {
-			$image = Image::fromBlank($this->width, $this->height, Image::rgb(50, 190, 212));
-			// @phpstan-ignore-next-line
-			$image->string(8, 8, 8, self::getFileExtension($val->getId()), $image->colorAllocate(0,0,0));
-			$content = $image->toString($this->format, $this->quality);
-		}
+		$content = self::isImageTypeByFilename($val->getId())
+			? $this->renderContentFor($val)
+			: $this->renderDefaultImageContent($val);
 		return Html::el('img')
 			->setAttribute('src', 'data:' . Image::typeToMimeType($this->format) . ';base64, ' . base64_encode($content))
 			->setAttribute('alt', $val->getName());
+	}
+
+
+
+	/**
+	 * Renders a thumbnail of the image, or a generic icon when the file
+	 * is not a loadable image (wrong type, missing or unreadable file).
+	 */
+	private function renderContentFor(FileUploaded | FileCurrent $src): string
+	{
+		try {
+			$image = Image::fromFile($src->getId());
+			$image->resize($this->width, $this->height, $this->flag);
+			return $image->toString($this->format, $this->quality);
+		}
+		catch (ImageException) {
+			return $this->renderDefaultImageContent($src);
+		}
+	}
+
+
+
+	private function renderDefaultImageContent(FileUploaded | FileCurrent $src): string
+	{
+		$image = Image::fromBlank($this->width, $this->height, Image::rgb(190, 190, 190));
+		// @phpstan-ignore-next-line
+		$image->string(8, 8, 8, self::getFileExtension($src->getId()), $image->colorAllocate(0, 0, 0));
+		return $image->toString($this->format, $this->quality);
 	}
 
 

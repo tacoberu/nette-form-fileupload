@@ -48,6 +48,18 @@ class GenericFilePreviewerTest extends TestCase
 
 
 
+	function testPreviewForMissingImageFallsBackToGenericIcon()
+	{
+		// An image extension, but the file does not exist - must not throw,
+		// it falls back to the generic icon instead.
+		$previewer = new GenericFilePreviewer();
+		$html = $previewer->getPreviewControlFor(new FileCurrent('uploaded/account/56695/missing.jpg', 'image/jpeg'));
+
+		$this->assertPreview($html, alt: 'missing.jpg');
+	}
+
+
+
 	protected function setUp(): void
 	{
 		if (!extension_loaded('gd')) {
