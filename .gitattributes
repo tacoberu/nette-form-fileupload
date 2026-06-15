@@ -9,4 +9,5 @@ phpunit.xml.dist export-ignore
 tests/ export-ignore
 docs/ export-ignore
 phpcs-custom/ export-ignore
+examples/ export-ignore
 *.sh eol=lf

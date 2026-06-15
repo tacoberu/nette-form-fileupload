@@ -1,0 +1,33 @@
+#
+# SECURITY WARNING: it is CRITICAL that this file & directory are NOT accessible directly via a web browser!
+#
+# If you don't protect this directory from direct web access, anybody will be able to see your passwords.
+# http://nette.org/security-warning
+#
+
+php:
+	date.timezone: Europe/Prague
+	# zlib.output_compression: yes
+
+application:
+	mapping:
+		*: App\Presenters\*Presenter
+	scanDirs: false
+
+services:
+	router: App\RouterFactory::createRouter
+	# - App\Model\AddressModel
+	#- App\Presenters\WizardForm
+	- Taco\Nette\Forms\Controls\FileUploadFactory
+	- Taco\Nette\Forms\Controls\UploadStoreTemp("pks")
+
+parameters:
+	uploads: %appDir%/../../var/uploads
+
+
+extensions:
+	filecontrol: Taco\Nette\Forms\Controls\FileControlExtension
+
+
+filecontrol:
+	store: Taco\Nette\Forms\Controls\UploadStoreTemp('uploading/txt-', baseDir: %tempDir%)

@@ -1,0 +1,12 @@
+nette:
+	database:
+		# postgresql
+#		dsn: 'pgsql:host=localhost;dbname=blog_dev'
+#		user: tacoberu
+#		password: tacoberu
+#		options:
+#			lazy: yes
+		# sqlite
+		dsn: 'sqlite:%appDir%/../../var/blog.sqlite3'
+		options:
+			lazy: yes
