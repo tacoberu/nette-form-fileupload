@@ -1,0 +1,211 @@
+<?xml version="1.0"?>
+<ruleset name="Taco">
+    <arg name="colors"/>
+    <arg name="extensions" value="php"/>
+    <arg value="sp"/>
+    <arg name="basepath" value="./"/>
+    <arg name="cache" value="./temp/phpcs.dat"/>
+	<arg name="tab-width" value="4"/>
+
+    <file>libs</file>
+    <file>examples/app</file>
+
+    <config name="installed_paths" value="vendor/slevomat/coding-standard,phpcs-custom"/>
+
+	<rule ref="vendor/slevomat/coding-standard/SlevomatCodingStandard/ruleset.xml">
+		<exclude name="SlevomatCodingStandard.Commenting.RequireOneLineDocComment.MultiLineDocComment" />
+		<exclude name="SlevomatCodingStandard.Commenting.RequireOneLinePropertyDocComment.MultiLinePropertyComment" />
+		<exclude name="SlevomatCodingStandard.Classes.ClassConstantVisibility.MissingConstantVisibility" />
+		<exclude name="SlevomatCodingStandard.Classes.ClassLength" />
+		<exclude name="SlevomatCodingStandard.Classes.RequireConstructorPropertyPromotion" />
+		<exclude name="SlevomatCodingStandard.Classes.SuperfluousExceptionNaming" />
+		<exclude name="SlevomatCodingStandard.Classes.ModernClassNameReference" />
+		<exclude name="SlevomatCodingStandard.ControlStructures.DisallowEmpty" />
+		<exclude name="SlevomatCodingStandard.ControlStructures.AssignmentInCondition" />
+		<exclude name="SlevomatCodingStandard.ControlStructures.DisallowShortTernaryOperator" />
+		<exclude name="SlevomatCodingStandard.Files.TypeNameMatchesFileName.NoMatchBetweenTypeNameAndFileName" />
+		<exclude name="SlevomatCodingStandard.Files.LineLength" />
+		<exclude name="SlevomatCodingStandard.Files.FileLength" />
+		<exclude name="SlevomatCodingStandard.Functions.RequireArrowFunction.RequiredArrowFunction" />
+		<exclude name="SlevomatCodingStandard.Functions.RequireTrailingCommaInCall" />
+		<exclude name="SlevomatCodingStandard.Functions.RequireTrailingCommaInDeclaration" />
+		<exclude name="SlevomatCodingStandard.Functions.FunctionLength" />
+		<exclude name="SlevomatCodingStandard.Namespaces.UseOnlyWhitelistedNamespaces.NonFullyQualified" />
+		<exclude name="SlevomatCodingStandard.Namespaces.FullyQualifiedClassNameInAnnotation.NonFullyQualifiedClassName" />
+		<exclude name="SlevomatCodingStandard.Namespaces.FullyQualifiedGlobalConstants.NonFullyQualified" />
+		<exclude name="SlevomatCodingStandard.Namespaces.FullyQualifiedGlobalFunctions.NonFullyQualified" />
+		<exclude name="SlevomatCodingStandard.Namespaces.FullyQualifiedExceptions.NonFullyQualifiedException" />
+		<exclude name="SlevomatCodingStandard.TypeHints.DisallowMixedTypeHint.DisallowedMixedTypeHint" />
+		<exclude name="SlevomatCodingStandard.TypeHints.ReturnTypeHint.MissingNativeTypeHint" />
+		<exclude name="SlevomatCodingStandard.TypeHints.ParameterTypeHint.MissingNativeTypeHint" />
+		<exclude name="SlevomatCodingStandard.TypeHints.UnionTypeHintFormat" />
+		<exclude name="SlevomatCodingStandard.Arrays.AlphabeticallySortedByKeys" />
+		<exclude name="SlevomatCodingStandard.PHP.ShortList" />
+
+		<!-- Duplicitní k phpstan -->
+		<exclude name="SlevomatCodingStandard.TypeHints.ReturnTypeHint.MissingAnyTypeHint" />
+		<exclude name="SlevomatCodingStandard.TypeHints.ParameterTypeHint.MissingAnyTypeHint" />
+
+		<!-- Ke zvážení -->
+		<!-- Moderní PHP 8.x konstrukce, které v kódu záměrně používáme. -->
+		<exclude name="SlevomatCodingStandard.Classes.DisallowConstructorPropertyPromotion" />
+		<exclude name="SlevomatCodingStandard.Exceptions.DisallowNonCapturingCatch" />
+		<!-- Pojmenované argumenty používáme záměrně pro čitelnost boolean parametrů. -->
+		<exclude name="SlevomatCodingStandard.Functions.DisallowNamedArguments" />
+		<exclude name="SlevomatCodingStandard.Numbers.RequireNumericLiteralSeparator" />
+		<exclude name="SlevomatCodingStandard.Exceptions.RequireNonCapturingCatch" />
+		<exclude name="SlevomatCodingStandard.Functions.UnusedParameter.UnusedParameter" />
+		<exclude name="SlevomatCodingStandard.Functions.RequireMultiLineCall" />
+		<exclude name="SlevomatCodingStandard.Classes.RequireAbstractOrFinal.ClassNeitherAbstractNorFinal" />
+		<exclude name="SlevomatCodingStandard.Classes.RequireMultiLineMethodSignature" />
+		<exclude name="SlevomatCodingStandard.Commenting.DocCommentSpacing.IncorrectLinesCountBetweenDescriptionAndAnnotations" />
+		<exclude name="SlevomatCodingStandard.Commenting.DisallowCommentAfterCode" />
+		<exclude name="SlevomatCodingStandard.Complexity.Cognitive" />
+		<exclude name="SlevomatCodingStandard.ControlStructures.EarlyExit" />
+		<exclude name="SlevomatCodingStandard.ControlStructures.RequireYodaComparison" />
+		<exclude name="SlevomatCodingStandard.ControlStructures.RequireNullCoalesceOperator" />
+		<exclude name="SlevomatCodingStandard.ControlStructures.UselessIfConditionWithReturn.UselessIfCondition" />
+		<exclude name="SlevomatCodingStandard.ControlStructures.NewWithoutParentheses" />
+		<exclude name="SlevomatCodingStandard.TypeHints.PropertyTypeHint" />
+		<exclude name="SlevomatCodingStandard.Operators.DisallowIncrementAndDecrementOperators" />
+		<exclude name="SlevomatCodingStandard.Operators.RequireOnlyStandaloneIncrementAndDecrementOperators" />
+		<exclude name="SlevomatCodingStandard.PHP.DisallowReference" />
+		<exclude name="SlevomatCodingStandard.PHP.ReferenceSpacing" />
+
+		<!-- dev -->
+		<exclude name="SlevomatCodingStandard.Namespaces.AlphabeticallySortedUses" />
+		<exclude name="SlevomatCodingStandard.Attributes.AttributesOrder" />
+	</rule>
+	<rule ref="DheeStyle.ControlStructures.NewlineBeforeKeyword"/>
+	<rule ref="Generic.WhiteSpace.DisallowSpaceIndent"/>
+
+	<rule ref="SlevomatCodingStandard.Namespaces.NamespaceSpacing">
+		<properties>
+			<property name="linesCountAfterNamespace" value="1"/>
+		</properties>
+	</rule>
+	<rule ref="SlevomatCodingStandard.Classes.MethodSpacing">
+		<properties>
+			<property name="minLinesCount" value="3"/>
+			<property name="maxLinesCount" value="3"/>
+		</properties>
+	</rule>
+	<rule ref="SlevomatCodingStandard.Namespaces.UseSpacing">
+		<properties>
+			<property name="linesCountAfterLastUse" value="2"/>
+		</properties>
+	</rule>
+	<rule ref="SlevomatCodingStandard.ControlStructures.JumpStatementsSpacing">
+		<severity>0</severity>
+	</rule>
+	<rule ref="SlevomatCodingStandard.ControlStructures.BlockControlStructureSpacing">
+		<severity>0</severity>  <!-- Vypne kontrolu -->
+	</rule>
+    <rule ref="SlevomatCodingStandard.TypeHints.DeclareStrictTypes">
+        <properties>
+            <property name="declareOnFirstLine" value="true"/>
+            <property name="spacesCountAroundEqualsSign" value="1"/>
+        </properties>
+    </rule>
+    <rule ref="SlevomatCodingStandard.Namespaces.UnusedUses">
+        <properties>
+            <property name="searchAnnotations" value="true"/>
+        </properties>
+    </rule>
+	<!-- Veřejné statické metody řadíme před konstruktor (jinak výchozí pořadí). -->
+	<rule ref="SlevomatCodingStandard.Classes.ClassStructure">
+		<properties>
+			<property name="groups" type="array">
+				<element value="uses"/>
+				<element value="enum cases"/>
+				<element value="public constants"/>
+				<element value="protected constants"/>
+				<element value="private constants"/>
+				<element value="public properties"/>
+				<element value="public static properties"/>
+				<element value="protected properties"/>
+				<element value="protected static properties"/>
+				<element value="private properties"/>
+				<element value="private static properties"/>
+				<element value="public static final methods"/>
+				<element value="public static abstract methods"/>
+				<element value="protected static final methods"/>
+				<element value="protected static abstract methods"/>
+				<element value="public final methods"/>
+				<element value="public abstract methods"/>
+				<element value="protected final methods"/>
+				<element value="protected abstract methods"/>
+				<element value="public static methods"/>
+				<element value="constructor"/>
+				<element value="static constructors"/>
+				<element value="destructor"/>
+				<element value="public methods"/>
+				<element value="protected methods"/>
+				<element value="protected static methods"/>
+				<element value="private methods"/>
+				<element value="private static methods"/>
+				<element value="magic methods"/>
+			</property>
+		</properties>
+	</rule>
+
+
+
+<!--
+	<rule ref="SlevomatCodingStandard.Classes.ClassMemberSpacing">
+		<properties>
+			<property name="linesCountAfterLastUse" value="2"/>
+		</properties>
+	</rule>
+-->
+
+
+
+<!--
+
+
+SlevomatCodingStandard.Namespaces.UseSpacing
+
+
+	<rule ref="SlevomatCodingStandard.Complexity.Cognitive">
+		<properties>
+			<property name="complexityLimit" value="8"/>
+		</properties>
+	</rule>
+-->
+
+	<!-- Vyloučení souborů a složek
+	<exclude-pattern>*/tests/*</exclude-pattern>
+	<exclude-pattern>*/vendor/*</exclude-pattern>
+	-->
+
+
+<!--
+	<rule ref="SlevomatCodingStandard.Namespaces.ReferenceUsedNamesOnly">
+		<properties>
+			<property name="allowFullyQualifiedGlobalClasses" value="true" />
+			<property name="ignoredNames" type="array">
+				<element value="stdClass"/>
+			</property>
+		</properties>
+	</rule>
+-->
+
+	<!-- Vlastní pravidla
+	<rule ref="SlevomatCodingStandard.Namespaces.ReferenceUsedNamesOnly">
+		<properties>
+			<property name="allowFullyQualifiedGlobalClasses" type="array">
+				<element value="\xtdClass"/>
+			</property>
+		</properties>
+	</rule>
+
+	<rule ref="Generic.Files.LineLength">
+		<properties>
+			<property name="lineLimit" value="120"/>
+			<property name="absoluteLineLimit" value="150"/>
+		</properties>
+	</rule>
+	-->
+
+</ruleset>

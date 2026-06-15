@@ -15,16 +15,22 @@
 	},
 	"require-dev": {
 		"phpstan/phpstan": "^1.10",
-		"phpunit/phpunit": "^10.0"
+		"phpunit/phpunit": "^10.0",
+		"slevomat/coding-standard": "^8.29"
 	},
 	"autoload": {
 		"classmap": ["libs"]
 	},
 	"scripts": {
 		"phpstan": "phpstan analyse",
-		"phpunit": "vendor/bin/phpunit"
+		"phpunit": "vendor/bin/phpunit",
+		"phpcs": "vendor/bin/phpcs",
+		"phpcbf": "vendor/bin/phpcbf"
 	},
 	"config": {
+		"allow-plugins": {
+			"dealerdirect/phpcodesniffer-composer-installer": true
+		},
 		"platform": {
 			"php": "8.1"
 		}
