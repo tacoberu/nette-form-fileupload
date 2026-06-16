@@ -35,55 +35,29 @@ class MultiFileControl extends NetteUploadControl
 	/**
 	 * A repository holding uploaded files before they are actually saved.
 	 * By default it's just a temp directory, see UploadStoreTemp
-	 *
-	 * @var UploadStore
 	 */
-	private $store;
+	private readonly UploadStore $store;
 
-	/**
-	 * @var ?FilePreviewer
-	 */
-	private $previewer = Null;
+	private ?FilePreviewer $previewer = Null;
 
-	/**
-	 * @var Html
-	 */
-	private $container;
+	private readonly Html $container;
 
-	/**
-	 * @var Html
-	 */
-	private $itemControl;
+	private readonly Html $itemControl;
 
-	/**
-	 * @var Html
-	 */
-	private $useCheckbox;
+	private readonly Html $useCheckbox;
 
 	/**
 	 * @var Html current file template
 	 */
-	private $currentControl;
+	private readonly Html $currentControl;
 
-	/**
-	 * @var Html
-	 */
-	private $previewControl;
+	private readonly Html $previewControl;
 
-	/**
-	 * @var Html
-	 */
-	private $labelControl;
+	private readonly Html $labelControl;
 
-	/**
-	 * @var Html
-	 */
-	private $transactionControl;
+	private readonly Html $transactionControl;
 
-	/**
-	 * @var Html
-	 */
-	private $preloadButton;
+	private readonly Html $preloadButton;
 
 	private string $prefix = "taco-filecontrol";
 
@@ -97,7 +71,7 @@ class MultiFileControl extends NetteUploadControl
 		Container::extensionMethod('addMulti' . $name, static function (
 			Container $container,
 			string $controlName,
-			string|Stringable|null $label = Null,
+			$label = Null,
 			?UploadStore $localStore = Null
 		) use ($store): self {
 			$control = new self($label, $localStore ?: $store);
@@ -144,7 +118,7 @@ class MultiFileControl extends NetteUploadControl
 			'formnovalidate' => '',
 		]);
 
-		$this->store = !empty($store)
+		$this->store = $store instanceof UploadStore
 			? $store
 			: new UploadStoreTemp();
 
@@ -160,9 +134,8 @@ class MultiFileControl extends NetteUploadControl
 
 	/**
 	 * By setting the previewer, uploaded files will be represented by their respective previews.
-	 * @return self
 	 */
-	function setPreviewer(FilePreviewer $var)
+	function setPreviewer(FilePreviewer $var): self
 	{
 		$this->previewer = $var;
 		return $this;
@@ -191,7 +164,7 @@ class MultiFileControl extends NetteUploadControl
 
 	/**
 	 * Returning values.
-	 * @return array<FileUploaded|FileCurrent>
+	 * @return array<FileUploaded | FileCurrent>
 	 */
 	function getValue()
 	{
@@ -206,7 +179,8 @@ class MultiFileControl extends NetteUploadControl
 	function loadHttpData(): void
 	{
 		// When I add a new Upload to the running request, the transaction number is missing
-		$this->store->setId($this->getHttpData(Form::DataLine, '[transaction]'));
+		$id = $this->getHttpData(Form::DataLine, '[transaction]');
+		$this->store->setId($id ? (int) $id : Null);
 
 		// Odškrtnutí znamená vyhodit.
 		$used = $this->getHttpData(Form::DataLine, '[use][]');
@@ -295,10 +269,7 @@ class MultiFileControl extends NetteUploadControl
 	 */
 	function isFilled(): bool
 	{
-		if (empty($this->value)) {
-			return False;
-		}
-		return True;
+		return !empty($this->value);
 	}
 
 
@@ -313,7 +284,7 @@ class MultiFileControl extends NetteUploadControl
 
 
 
-	private function getCurrentPart(string $name, FileUploaded|FileCurrent $value): Html
+	private function getCurrentPart(string $name, FileUploaded | FileCurrent $value): Html
 	{
 		$el = clone $this->currentControl;
 		$el->value = Utils::serializeFile($value);
@@ -323,7 +294,7 @@ class MultiFileControl extends NetteUploadControl
 
 
 
-	private function getPreviewControlPart(FileUploaded|FileCurrent $src): Html
+	private function getPreviewControlPart(FileUploaded | FileCurrent $src): Html
 	{
 		if (empty($this->previewer)) {
 			$el = clone $this->previewControl;
@@ -335,7 +306,7 @@ class MultiFileControl extends NetteUploadControl
 
 
 
-	private function getLabelControlPart(FileUploaded|FileCurrent $src): Html
+	private function getLabelControlPart(FileUploaded | FileCurrent $src): Html
 	{
 		$el = clone $this->labelControl;
 		$el->setText($src->getName());
@@ -344,7 +315,7 @@ class MultiFileControl extends NetteUploadControl
 
 
 
-	private function getUseCheckboxPart(string $name, FileUploaded|FileCurrent $src): Html
+	private function getUseCheckboxPart(string $name, FileUploaded | FileCurrent $src): Html
 	{
 		$el = clone $this->useCheckbox;
 		$el->name = $name . '[use][]';
@@ -364,11 +335,11 @@ class MultiFileControl extends NetteUploadControl
 
 
 
-	private function getItemControlPart(string $name, FileUploaded|FileCurrent|Null $value): Html
+	 private function getItemControlPart(string $name, null | FileUploaded | FileCurrent $value): Html
 	{
 		$el = clone $this->itemControl;
 		if (empty($value)) {
-			$el->addHtml($this->getNewControlPart($name, withoutRequired: False));
+			$el->addHtml($this->getNewControlPart($name, False));
 			$el->appendAttribute("class", $this->formatClass('upload'));
 		}
 		else {
@@ -420,7 +391,7 @@ class MultiFileControl extends NetteUploadControl
 
 
 
-	private static function assertFileValue(FileCurrent $m): void
+	private static function assertFileValue(FileCurrent $x): void
 	{
 		// The parameter type-hint already guarantees the value;
 		// kept as an extension point for stricter checks.

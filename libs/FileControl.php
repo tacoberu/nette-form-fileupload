@@ -31,45 +31,31 @@ use LogicException;
 class FileControl extends NetteUploadControl
 {
 
-	const RemoveButtonLabel = "✕"; // &#x2715;
+	public const RemoveButtonLabel = "✕"; // &#x2715;
 
 	/**
 	 * A repository holding uploaded files before they are actually saved.
 	 * By default it's just a temp directory, see UploadStoreTemp
-	 *
-	 * @var UploadStore
 	 */
-	private $store;
+	private readonly UploadStore $store;
 
-	/**
-	 * @var ?FilePreviewer
-	 */
-	private $previewer = Null;
+	private ?FilePreviewer $previewer = Null;
 
-	/**
-	 * @var Html
-	 */
-	private $container;
+	private readonly Html $container;
 
 	/**
 	 * @var Html remove button template
 	 */
-	private $removeButton;
+	private readonly Html $removeButton;
 
 	/**
 	 * @var Html current file template
 	 */
-	private $currentControl;
+	private readonly Html $currentControl;
 
-	/**
-	 * @var Html
-	 */
-	private $previewControl;
+	private readonly Html $previewControl;
 
-	/**
-	 * @var Html
-	 */
-	private $transactionControl;
+	private readonly Html $transactionControl;
 
 	private string $prefix = "taco-filecontrol";
 
@@ -83,7 +69,7 @@ class FileControl extends NetteUploadControl
 		Container::extensionMethod('add' . $name, static function (
 			Container $container,
 			string $controlName,
-			string|Stringable|null $label = Null,
+			$label = Null,
 			?UploadStore $localStore = Null
 		) use ($store): self {
 			$control = new self($label, $localStore ?: $store);
@@ -99,7 +85,7 @@ class FileControl extends NetteUploadControl
 		parent::__construct($label, false);
 
 		$this->setHtmlAttribute('data-taco-type', 'file');
-		$this->store = !empty($store)
+		$this->store = $store instanceof UploadStore
 			? $store
 			: new UploadStoreTemp();
 		$this->container = Html::el('div', [
@@ -127,9 +113,8 @@ class FileControl extends NetteUploadControl
 
 	/**
 	 * By setting the previewer, uploaded files will be represented by their respective previews.
-	 * @return self
 	 */
-	function setPreviewer(FilePreviewer $var)
+	function setPreviewer(FilePreviewer $var): self
 	{
 		$this->previewer = $var;
 		return $this;
@@ -143,7 +128,8 @@ class FileControl extends NetteUploadControl
 	function loadHttpData(): void
 	{
 		// When I add a new Upload to the running request, the transaction number is missing
-		$this->store->setId($this->getHttpData(Form::DataLine, '[transaction]'));
+		$id = $this->getHttpData(Form::DataLine, '[transaction]');
+		$this->store->setId($id ? (int) $id : Null);
 
 		if ($file = $this->getHttpData(Form::DataFile, '[new]')) {
 			if ($file->isOk()) {
@@ -216,10 +202,7 @@ class FileControl extends NetteUploadControl
 
 
 
-	/**
-	 * @return static
-	 */
-	function setValue($value)
+	function setValue($value): self
 	{
 		if ($value instanceof FileCurrent) {
 			$this->value = clone $value;
@@ -255,7 +238,7 @@ class FileControl extends NetteUploadControl
 					->addHtml($this->getCurrentPart($name, $this->value))
 					->addHtml($this->getPreviewControlPart($this->value))
 					->addHtml($this->getRemoveButtonPart($name))
-					->addHtml($this->getNewControlPart($name, withoutRequired: True))
+					->addHtml($this->getNewControlPart($name, True))
 					->addHtml($this->getTransactionControlPart($name));
 
 			// No file selected
@@ -265,7 +248,7 @@ class FileControl extends NetteUploadControl
 				$name = $this->getHtmlName();
 				$container = clone $this->container;
 				return $container
-					->addHtml($this->getNewControlPart($name, withoutRequired: False))
+					->addHtml($this->getNewControlPart($name, False))
 					->addHtml($this->getTransactionControlPart($name));
 
 			default:
@@ -314,7 +297,7 @@ class FileControl extends NetteUploadControl
 
 
 
-	function getCurrentPart(string $name, FileUploaded|FileCurrent $value): Html
+	function getCurrentPart(string $name, FileUploaded | FileCurrent $value): Html
 	{
 		$el = clone $this->currentControl;
 		$el->value = Utils::serializeFile($value);
@@ -331,7 +314,7 @@ class FileControl extends NetteUploadControl
 
 
 
-	function getPreviewControlPart(FileUploaded|FileCurrent $src): Html
+	function getPreviewControlPart(FileUploaded | FileCurrent $src): Html
 	{
 		if (empty($this->previewer)) {
 			$el = clone $this->previewControl;
