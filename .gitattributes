@@ -7,6 +7,7 @@ phpstan.neon export-ignore
 phpstan-baseline.neon export-ignore
 phpunit.xml.dist export-ignore
 tests/ export-ignore
+docs/ export-ignore
 phpcs-custom/ export-ignore
 examples/ export-ignore
 *.sh eol=lf
