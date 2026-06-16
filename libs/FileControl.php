@@ -71,6 +71,8 @@ class FileControl extends NetteUploadControl
 	 */
 	private $transactionControl;
 
+	private string $prefix = "taco-filecontrol";
+
 	/**
 	 * Registers a form extension method `add{$name}` (default `addFileControl`),
 	 * which creates a FileControl with the store injected from the DI container.
@@ -101,7 +103,7 @@ class FileControl extends NetteUploadControl
 			? $store
 			: new UploadStoreTemp();
 		$this->container = Html::el('div', [
-			'class' => 'taco-file-control',
+			'class' => $this->formatClass(Null),
 		]);
 		$this->removeButton = Html::el('input', [
 			'type' => 'submit',
@@ -355,6 +357,15 @@ class FileControl extends NetteUploadControl
 		$el->name = $name . '[transaction]';
 		$el->value = (string) $this->store->getId();
 		return $el;
+	}
+
+
+
+	private function formatClass(?string $suffix): string
+	{
+		return $suffix
+			? "{$this->prefix}-{$suffix}"
+			: $this->prefix;
 	}
 
 }

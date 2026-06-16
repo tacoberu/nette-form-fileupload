@@ -1,0 +1,82 @@
+/**
+ * Defaultní barvičky podle systému.
+ */
+div.taco-filecontrol {
+	border: 1px solid ButtonBorder;
+	/* background-color: Field; */
+}
+div.taco-filecontrol-row {
+	border-bottom: 1px solid ButtonBorder;
+}
+div.taco-filecontrol-row:last-child {
+	border: 0 none;
+}
+
+
+div.taco-filecontrol-row {
+	padding: 2px;
+}
+
+div.taco-filecontrol-row:not(.taco-filecontrol-upload) {
+	display: grid;
+/*
+	grid-template-columns: 80px 1fr 2rem;
+*/
+	grid-template-columns: 1fr auto;
+}
+
+div.taco-filecontrol-row > label > input[type="checkbox"] {
+	margin-right: 1.8em;
+	cursor: pointer;
+	width: 0;
+position: absolute;
+}
+
+div.taco-filecontrol-row > label {
+	display: inline-block;
+	width: 2rem;
+	text-align: right;
+	vertical-align: top;
+	margin: 3px 2px;
+	order: 3;
+}
+
+div.taco-filecontrol-row > label:after {
+	content: "×";
+	font-size: medium;
+	padding: 1px 6px 1px 7px;
+	background-color: ButtonFace;
+	border: 1px solid ButtonBorder;
+	border-radius: 4px;
+	margin-right: 2px;
+}
+
+div.taco-filecontrol-row > img {
+	width: 80px;
+}
+
+div.taco-filecontrol-row > span {
+	display: inline-block;
+	text-align: left;
+	vertical-align: top;
+	margin: 3px 2px;
+	padding: 1px 2px;
+	/* background-color: Field; */
+}
+
+div.taco-filecontrol-upload {
+	border: 0 none;
+	/* border: 3px solid yellow; */
+}
+div.taco-filecontrol-upload > div.taco-filecontrol-row {
+	/* border: 3px solid green; */
+}
+div.taco-filecontrol-upload > input.taco-filecontrol-preload {
+	/* border: 3px solid red; */
+}
+
+
+/* když je checked odškrtuný, tak celý řádek schovat */
+div.taco-filecontrol-row:has(input[type="checkbox"]:not(:checked)) {
+	display: none;
+}
