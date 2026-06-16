@@ -67,6 +67,8 @@ if (jQuery)(function($) {
 		{
 			context.spinnerUrl || $.error("Unused require option 'spinnerUrl'.");
 
+console.log("X");
+
 			// Doplnit id, pokud není.
 			if ( ! self.id) {
 				context.snippet = '#' + deriveSelector(index, self);
@@ -125,6 +127,9 @@ if (jQuery)(function($) {
 		 */
 		function filePreuploader(method)
 		{
+			console.log("A");
+
+
 			/**
 			 *	Default configuration of plugin.
 			 */

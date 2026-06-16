@@ -73,12 +73,19 @@ class MultiFileControl extends NetteUploadControl
 	/**
 	 * @var Html
 	 */
+	private $labelControl;
+
+	/**
+	 * @var Html
+	 */
 	private $transactionControl;
 
 	/**
 	 * @var Html
 	 */
 	private $preloadButton;
+
+	private string $prefix = "taco-filecontrol";
 
 	/**
 	 * Registers a form extension method `addMulti{$name}` (default `addMultiFileControl`),
@@ -106,12 +113,11 @@ class MultiFileControl extends NetteUploadControl
 		parent::__construct($label);
 
 		$this->container = Html::el('div', [
-			'data-taco-type' => 'file',
-			'class' => 'taco-file-control taco-multifile-control',
-			//~ 'style' => 'border: 1px solid red',
+			'data-taco-type' => 'file multiple',
+			'class' => $this->formatClass(Null) . ' ' . $this->formatClass('multiple'),
 		]);
 		$this->itemControl = Html::el('div', [
-			//~ 'style' => 'border: 1px solid green',
+			'class' => $this->formatClass('row'),
 		]);
 		$this->useCheckbox = Html::el('input', [
 			'type' => 'checkbox',
@@ -125,12 +131,16 @@ class MultiFileControl extends NetteUploadControl
 		$this->previewControl = Html::el('input', [
 			'readonly' => 1,
 		]);
+		$this->labelControl = Html::el('span', [
+		]);
 		$this->transactionControl = Html::el('input', [
 			'type' => 'hidden',
 		]);
 		$this->preloadButton = Html::el('input', [
 			'type' => 'submit',
-			'value' => $this->translate('Preload'),
+			'value' => $this->translate('↻'),
+			'class' => $this->formatClass('preload'),
+			'title' => $this->translate('Preload'),
 			'formnovalidate' => '',
 		]);
 
@@ -248,52 +258,12 @@ class MultiFileControl extends NetteUploadControl
 		foreach ($this->value as $item) {
 			$container->addHtml($this->getItemControlPart($name, $item));
 		}
-		$container->addHtml($this->getItemControlPart($name, Null));
-		$container->addHtml($this->getPreloadButtonPart($name));
+		$row = $this->getItemControlPart($name, Null);
+		$row->addHtml($this->getPreloadButtonPart($name));
+		$container->addHtml($row);
 		$container->addHtml($this->getTransactionControlPart($name));
 
 		return $container;
-	}
-
-
-
-	function getCurrentPart(string $name, FileUploaded|FileCurrent $value): Html
-	{
-		$el = clone $this->currentControl;
-		$el->value = Utils::serializeFile($value);
-		$el->name = $name . '[current][]';
-		return $el;
-	}
-
-
-
-	function getPreviewControlPart(FileUploaded|FileCurrent $src): Html
-	{
-		if (empty($this->previewer)) {
-			$el = clone $this->previewControl;
-			$el->value = $src->getName();
-			return $el;
-		}
-		return $this->previewer->getPreviewControlFor($src);
-	}
-
-
-
-	function getUseCheckboxPart(string $name, FileUploaded|FileCurrent $src): Html
-	{
-		$el = clone $this->useCheckbox;
-		$el->name = $name . '[use][]';
-		$el->value = Utils::serializeFile($src);
-		return $el;
-	}
-
-
-
-	function getPreloadButtonPart(string $name): Html
-	{
-		$el = clone $this->preloadButton;
-		$el->name = $name . '[preload]';
-		return $el;
 	}
 
 
@@ -331,16 +301,69 @@ class MultiFileControl extends NetteUploadControl
 
 
 
+	private function getCurrentPart(string $name, FileUploaded|FileCurrent $value): Html
+	{
+		$el = clone $this->currentControl;
+		$el->value = Utils::serializeFile($value);
+		$el->name = $name . '[current][]';
+		return $el;
+	}
+
+
+
+	private function getPreviewControlPart(FileUploaded|FileCurrent $src): Html
+	{
+		if (empty($this->previewer)) {
+			$el = clone $this->previewControl;
+			$el->value = $src->getName();
+			return $el;
+		}
+		return $this->previewer->getPreviewControlFor($src);
+	}
+
+
+
+	private function getLabelControlPart(FileUploaded|FileCurrent $src): Html
+	{
+		$el = clone $this->labelControl;
+		$el->setText($src->getName());
+		return $el;
+	}
+
+
+
+	private function getUseCheckboxPart(string $name, FileUploaded|FileCurrent $src): Html
+	{
+		$el = clone $this->useCheckbox;
+		$el->name = $name . '[use][]';
+		$el->value = Utils::serializeFile($src);
+		// The name/value must sit on the checkbox itself, otherwise it is not submitted.
+		return Html::el('label')->addHtml($el);
+	}
+
+
+
+	private function getPreloadButtonPart(string $name): Html
+	{
+		$el = clone $this->preloadButton;
+		$el->name = $name . '[preload]';
+		return $el;
+	}
+
+
+
 	private function getItemControlPart(string $name, FileUploaded|FileCurrent|Null $value): Html
 	{
 		$el = clone $this->itemControl;
 		if (empty($value)) {
 			$el->addHtml($this->getNewControlPart($name, withoutRequired: False));
+			$el->appendAttribute("class", $this->formatClass('upload'));
 		}
 		else {
 			$el->addHtml($this->getUseCheckboxPart($name, $value));
 			$el->addHtml($this->getCurrentPart($name, $value));
 			$el->addHtml($this->getPreviewControlPart($value));
+			$el->addHtml($this->getLabelControlPart($value));
 		}
 		return $el;
 	}
@@ -372,6 +395,15 @@ class MultiFileControl extends NetteUploadControl
 		$el->name = $name . '[transaction]';
 		$el->value = (string) $this->store->getId();
 		return $el;
+	}
+
+
+
+	private function formatClass(?string $suffix): string
+	{
+		return $suffix
+			? "{$this->prefix}-{$suffix}"
+			: $this->prefix;
 	}
 
 
