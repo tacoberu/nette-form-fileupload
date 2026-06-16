@@ -1,23 +1,31 @@
 Nette form FileControl
 ======================
 
-Uploading files is easy. But if we have the file already uploaded in the system, we can want
+Uploading files is easy. But once a file is already stored in the system, it is sometimes needed to
 
 - only display it (preferably with a preview),
 - or delete the file,
-- or replace the file with another version.
+- or replace it with another version.
 
-A somewhat inconvenient situation is when we get some unrelated error elsewhere in the form.
-So we return the form for the user to correct it. But the uploaded file or files must be restarted.
-We solve this with a transaction. Once uploaded, the file is stored in a special storage (by default it is handled as a tempo directory, it can be changed),
-and entered into the system after successfully saving the form.
+There are several issues with the standard file input:
 
-We represent image files as images. If the standard renderer is not suitable, we can set our own.
+1. It is inconvenient that the original file cannot be shown in any reasonable way — unlike other inputs, where the original value can be displayed.
+2. Related to that is how to delete an existing file.
+3. It is inconvenient when an unrelated error occurs elsewhere in the form. The form is then returned so the user can fix it — but the uploaded file (or files) has to be selected again.
+4. When uploading a file with a form, working with files is *different* from the other fields.
+5. Uploading large files is a chapter of its own.
 
-The input value can have three options:
+**FileControl** tries to solve this with several techniques:
 
-- `Null`: none, or original file deleted
-- `FileUploaded`: new file uploaded
+1. An existing file is represented by a value of the `FileCurrent` class. If the user deletes it, the form holds a `FileCurrent` value with the `remove` property set to `True`.
+2. All uploaded files are kept in a transaction. Once uploaded, a file is stored in a special storage (by default handled as a directory in temp, which can be changed) and committed to the system after the form is saved successfully.
+
+Image files can be represented as images. If the standard renderer is not suitable, a custom one can be set.
+
+The input value can take one of three forms:
+
+- `Null`: none, or the original file was deleted
+- `FileUploaded`: a newly uploaded file
 - `FileCurrent`: the original file stored in the system
 
 
@@ -27,8 +35,19 @@ composer require tacoberu/nette-form-fileupload
 ```
 
 
-### Use
+### Usage
+The extension has to be registered and configured in `config.neon`:
+```neon
+extensions:
+	filecontrol: Taco\Nette\Forms\Controls\FileControlExtension
 
+
+filecontrol:
+	store: Taco\Nette\Forms\Controls\UploadStoreTemp('uploading/txt-', baseDir: %tempDir%)
+
+```
+
+It can then be used in a form:
 ```php
 use Taco\Nette\Forms\Controls\FileCurrent;
 use Taco\Nette\Forms\Controls\FileControl;
@@ -36,34 +55,69 @@ use Taco\Nette\Forms\Controls\GenericFilePreviewer;
 
 $form = new Nette\Forms\Form;
 
-$form['portrait'] = (new FileControl('Portrait:'))
-	->setDefaultValue(new FileCurrent("uploaded/account/56695/mp16.jpg", "image/jpeg"))
-	->setPreviewer(new GenericFilePreviewer());
-
-
+$form->addFileControl('portrait', 'Portrait');
+$form->addMultiFileControl('attachments1', 'Attachments 1');
 ```
+
+A form with a single file (`FileControl`) — an uploaded file has a delete button:
+
+![Form with FileControl](docs/file.png)
+
+A form with multiple files (`MultiFileControl`) — with image previews, deletion of individual items (✕) and the ↻ button for preloading without submitting the whole form:
+
+![Form with MultiFileControl](docs/files.png)
+
+
+
+### setPreviewer()
+
+A previewer can be set on the FileControl to control how file previews are formatted. With `GenericFilePreviewer`, a preview of an image file is available.
+
+### getRemoveButtonPrototype()
+
+Allows customizing the look of the delete button: label, classes, title.
+
+
+### getCurrentControlPrototype()
+
+Allows customizing how the input looks when it has a selected value.
+
+
+### getPreviewControlPart()
+
+Allows customizing the file preview without using a previewer.
 
 
 ### Transactions
 
-When the file is successfully uploaded to the server, it is automatically moved to the storage, transaction. This will serve to
-if the form is not processed, but is, for example, passed back to the user for validation reasons, it is not necessary to upload the file again.
-After successful processing, the file is available using $control->getValue() like the other values.
+When a file is successfully uploaded to the server, it is automatically moved to the storage — a transaction. This serves the purpose that if the form is not processed but is, for example, returned to the user because of validation, the file does not have to be uploaded again. After successful processing, the file is available via `$control->getValue()` like the other values.
 
-After the file is uploaded to the system, the transaction can be discarded. Well, in case
-using the default storage `UploadStoreTemp`, delete the directory. We can either do this explicitly:
+If the form is discarded — for example the user closes the page or clicks cancel — the uploaded files stay in the transaction and get in no one's way.
+
+Once a file has been uploaded into the system, the transaction can be discarded — that is, with the default `UploadStoreTemp` storage, the directory is deleted. This can be done either explicitly:
 
 ```php
 $form['portrait']->destroyStore();
 ```
 
-Or leave it to the GC, which will delete it automatically after a certain period of time.
+Or it can be left to the GC, which deletes it automatically after a certain time.
 
 #### UploadStoreTemp, GC
 
-Automatic greasing is implemented in `UploadStoreTemp`. it acts like
-that after the page exits, all relevant transactions are passed through the destructor
-and checks if the transaction is older than `UploadStoreTemp::$gcAgeLimit`.
-This only deletes `UploadStoreTemp::$gcMaxCount` transactions/directories to spread the load.
+Automatic cleanup is implemented in `UploadStoreTemp`. It works so that after the page finishes, the destructor goes through all the relevant transactions and checks whether a transaction is older than `UploadStoreTemp::$gcAgeLimit`.
+To spread the load, only `UploadStoreTemp::$gcMaxCount` transactions/directories are deleted at a time.
 
-This behavior is only a matter of the `UploadStoreTemp` implementation.
+This behavior is solely a matter of the `UploadStoreTemp` implementation.
+
+
+## E2E tests (Playwright)
+
+	npm install
+	npx playwright install chromium  # first time only
+
+	npm run test:e2e        # run the tests
+	npm run test:e2e:ui     # interactive UI
+
+Outputs (report, results) are saved to `temp/`.
+
+The URL of the tested application is configured in `.env` via `APP_URL`.
