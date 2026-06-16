@@ -1,21 +1,20 @@
-<?php
+<?php declare(strict_types = 1);
+
 /**
  * Copyright (c) since 2004 Martin Takáč (http://martin.takac.name)
- * @license   https://opensource.org/licenses/MIT MIT
+ * @license https://opensource.org/licenses/MIT MIT
  */
 
 namespace Taco\Nette\Forms\Controls;
 
-use Nette,
-	Nette\Utils\Html,
-	Nette\Utils\Validators,
-	Nette\Forms\Form,
-	Nette\Forms\Controls\BaseControl,
-	Nette\Forms\Controls\SubmitButton,
-	Nette\Forms\Controls\UploadControl as NetteUploadControl,
-	Nette\Http\FileUpload;
-use LogicException;
+use Nette;
+use Nette\Utils\Html;
+use Nette\Forms\Form;
+use Nette\Forms\Container;
+use Nette\Forms\Controls\SubmitButton;
+use Nette\Forms\Controls\UploadControl as NetteUploadControl;
 use Stringable;
+use LogicException;
 
 
 /**
@@ -62,7 +61,7 @@ class MultiFileControl extends NetteUploadControl
 	private $useCheckbox;
 
 	/**
-	 * @var Html  current file template
+	 * @var Html current file template
 	 */
 	private $currentControl;
 
@@ -81,10 +80,31 @@ class MultiFileControl extends NetteUploadControl
 	 */
 	private $preloadButton;
 
+	/**
+	 * Registers a form extension method `addMulti{$name}` (default `addMultiFileControl`),
+	 * which creates a MultiFileControl with the store injected from the DI container.
+	 * The store can still be overridden by an explicit last argument.
+	 */
+	static function register(string $name = 'FileControl', ?UploadStore $store = Null): void
+	{
+		Container::extensionMethod('addMulti' . $name, static function (
+			Container $container,
+			string $controlName,
+			string|Stringable|null $label = Null,
+			?UploadStore $localStore = Null
+		) use ($store): self {
+			$control = new self($label, $localStore ?: $store);
+			$container->addComponent($control, $controlName);
+			return $control;
+		});
+	}
 
-	function __construct(string|Stringable|null $label = null, UploadStore $store = Null)
+
+
+	function __construct(string|Stringable|null $label = null, ?UploadStore $store = Null)
 	{
 		parent::__construct($label);
+
 		$this->container = Html::el('div', [
 			'data-taco-type' => 'file',
 			'class' => 'taco-file-control taco-multifile-control',
@@ -114,9 +134,11 @@ class MultiFileControl extends NetteUploadControl
 			'formnovalidate' => '',
 		]);
 
-		$this->store = (!empty($store)) ? $store : new UploadStoreTemp();
+		$this->store = !empty($store)
+			? $store
+			: new UploadStoreTemp();
 
-		$this->monitor(Form::class, function (Form $form): void {
+		$this->monitor(Form::class, static function (Form $form): void {
 			if ( ! $form->isMethod('post')) {
 				throw new Nette\InvalidStateException('File upload requires method POST.');
 			}
@@ -170,10 +192,8 @@ class MultiFileControl extends NetteUploadControl
 
 	/**
 	 * Loads HTTP data. Files moved to transaction.
-	 *
-	 * @return void
 	 */
-	function loadHttpData() : void
+	function loadHttpData(): void
 	{
 		// When I add a new Upload to the running request, the transaction number is missing
 		$this->store->setId($this->getHttpData(Form::DataLine, '[transaction]'));
@@ -189,12 +209,9 @@ class MultiFileControl extends NetteUploadControl
 				}
 				$value = Utils::createFileUploadedFromValue($rawvalue);
 				// If it's in the store, it's not committed. How else would he get here?
-				if ($this->store->exists($value->getId())) {
-					$values[] = $value;
-				}
-				else {
-					$values[] = Utils::createFileCurrentFromValue($rawvalue);
-				}
+				$values[] = $this->store->exists($value->getId())
+					? $value
+					: Utils::createFileCurrentFromValue($rawvalue);
 			}
 		}
 
@@ -240,22 +257,6 @@ class MultiFileControl extends NetteUploadControl
 
 
 
-	private function getItemControlPart(string $name, FileUploaded|FileCurrent|Null $value): Html
-	{
-		$el = clone $this->itemControl;
-		if (empty($value)) {
-			$el->addHtml($this->getNewControlPart($name, withoutRequired: False));
-		}
-		else {
-			$el->addHtml($this->getUseCheckboxPart($name, $value));
-			$el->addHtml($this->getCurrentPart($name, $value));
-			$el->addHtml($this->getPreviewControlPart($value));
-		}
-		return $el;
-	}
-
-
-
 	function getCurrentPart(string $name, FileUploaded|FileCurrent $value): Html
 	{
 		$el = clone $this->currentControl;
@@ -288,39 +289,10 @@ class MultiFileControl extends NetteUploadControl
 
 
 
-	private function getNewControlPart(string $name, bool $withoutRequired): Html
-	{
-		$el = parent::getControl();
-		if (!$el instanceof Html) {
-			throw new LogicException("Expected only Html type.");
-		}
-		$el = clone $el;
-		$el->name = $name . '[new][]';
-		$el->multiple = True;
-		// Existenci validujeme podle $name[current], ale nový záznam podle $name[new].
-		if ($withoutRequired) {
-			unset($el->required);
-			$el->setAttribute('data-nette-rules', Utils::removeFilledRules($el->getAttribute('data-nette-rules')));
-		}
-		return $el;
-	}
-
-
-
 	function getPreloadButtonPart(string $name): Html
 	{
 		$el = clone $this->preloadButton;
 		$el->name = $name . '[preload]';
-		return $el;
-	}
-
-
-
-	private function getTransactionControlPart(string $name): Html
-	{
-		$el = clone $this->transactionControl;
-		$el->name = $name . '[transaction]';
-		$el->value = (string) $this->store->getId();
 		return $el;
 	}
 
@@ -359,7 +331,55 @@ class MultiFileControl extends NetteUploadControl
 
 
 
+	private function getItemControlPart(string $name, FileUploaded|FileCurrent|Null $value): Html
+	{
+		$el = clone $this->itemControl;
+		if (empty($value)) {
+			$el->addHtml($this->getNewControlPart($name, withoutRequired: False));
+		}
+		else {
+			$el->addHtml($this->getUseCheckboxPart($name, $value));
+			$el->addHtml($this->getCurrentPart($name, $value));
+			$el->addHtml($this->getPreviewControlPart($value));
+		}
+		return $el;
+	}
+
+
+
+	private function getNewControlPart(string $name, bool $withoutRequired): Html
+	{
+		$el = parent::getControl();
+		if (!$el instanceof Html) {
+			throw new LogicException("Expected only Html type.");
+		}
+		$el = clone $el;
+		$el->name = $name . '[new][]';
+		$el->multiple = True;
+		// Existenci validujeme podle $name[current], ale nový záznam podle $name[new].
+		if ($withoutRequired) {
+			unset($el->required);
+			$el->setAttribute('data-nette-rules', Utils::removeFilledRules($el->getAttribute('data-nette-rules')));
+		}
+		return $el;
+	}
+
+
+
+	private function getTransactionControlPart(string $name): Html
+	{
+		$el = clone $this->transactionControl;
+		$el->name = $name . '[transaction]';
+		$el->value = (string) $this->store->getId();
+		return $el;
+	}
+
+
+
 	private static function assertFileValue(FileCurrent $m): void
 	{
+		// The parameter type-hint already guarantees the value;
+		// kept as an extension point for stricter checks.
 	}
+
 }

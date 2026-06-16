@@ -1,7 +1,8 @@
-<?php
+<?php declare(strict_types = 1);
+
 /**
  * Copyright (c) since 2004 Martin Takáč (http://martin.takac.name)
- * @license   https://opensource.org/licenses/MIT MIT
+ * @license https://opensource.org/licenses/MIT MIT
  */
 
 namespace Taco\Nette\Forms\Controls;
@@ -19,105 +20,69 @@ class FileCurrent
 
 	use Nette\SmartObject;
 
-
 	/**
 	 * @sample "mp16.jpg"
-	 * @var string
 	 */
-	private $name;
+	private ?string $name;
 
 	/**
-	 * @sample "/tmp/upload-669965256695/mp16.jpg"
-	 * @var string
-	 */
-	private $path;
+	  * If $committed == True && $remove == True - The file uploaded to the system to be deleted.
+	  * If $committed == False && $remove == True - The file uploaded to the transaction to be removed from the transaction.
+	  */
+	 private bool $remove = False;
 
 	/**
-	 * @sample "image/jpeg"
-	 * @var string
-	 */
-	private $type;
-
-	/**
-	 * If $committed == True && $remove == True - The file uploaded to the system to be deleted.
-	 * If $committed == False && $remove == True - The file uploaded to the transaction to be removed from the transaction.
-	 * @var boolean
-	 */
-	private $remove = False;
-
-
-	/**
-	 * @param string $path Path to the real file. It serves as an identifier. Whether it is a real file that can be loaded is up to the cooperating services. For example FilePreviewer. But usually it will be a good idea.
+	 * @param string $path Path to the real file. It serves as an identifier. Whether it is a real file
+	 * 		that can be loaded is up to the cooperating services. For example FilePreviewer. But usually
+	 * 		it will be a good idea. For example: "/tmp/upload-669965256695/mp16.jpg"
 	 * @param string $type Mimetype as: "image/jpeg"
-	 * @param ?string $name
 	 */
-	function __construct($path, $type, $name = Null)
+	function __construct(private $path, private $type, ?string $name = Null)
 	{
-		$this->path = $path;
-		$this->type = $type;
 		$this->name = $name;
 		if (empty($this->name)) {
-			$this->name = basename($path);
+			$this->name = basename($this->path);
 		}
 	}
 
 
 
-	/**
-	 * @return string
-	 */
-	function getName()
+	function getName(): string
 	{
 		return $this->name;
 	}
 
 
 
-	/**
-	 * @return string
-	 */
-	function getTemporaryFile()
+	function getTemporaryFile(): string
 	{
 		return $this->path;
 	}
 
 
 
-	/**
-	 * @return string
-	 */
-	function getPath()
+	function getPath(): string
 	{
 		return $this->path;
 	}
 
 
 
-	/**
-	 * @return string
-	 */
-	function getId()
+	function getId(): string
 	{
 		return $this->path;
 	}
 
 
 
-	/**
-	 * @return boolean
-	 */
-	function isRemove()
+	function isRemove(): bool
 	{
 		return $this->remove;
 	}
 
 
 
-	/**
-	 * @param boolean $val
-	 * @return self
-	 */
-	function setRemove($val = True)
+	function setRemove(bool $val = True): self
 	{
 		$this->remove = $val;
 		return $this;
@@ -125,10 +90,7 @@ class FileCurrent
 
 
 
-	/**
-	 * @return string
-	 */
-	function getContentType()
+	function getContentType(): string
 	{
 		return $this->type;
 	}

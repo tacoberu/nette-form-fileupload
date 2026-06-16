@@ -1,58 +1,74 @@
-<?php
+<?php declare(strict_types = 1);
+
 /**
  * Copyright (c) since 2004 Martin Takáč (http://martin.takac.name)
- * @license   https://opensource.org/licenses/MIT MIT
+ * @license https://opensource.org/licenses/MIT MIT
  */
 
 namespace Taco\Nette\Forms\Controls;
 
 use Nette\Http\FileUpload;
+use Nette\Utils\Html;
 
 
 /**
- * Úložiště uchovávající nahrávané soubory před tím, než se skutečně uloží.A repository holding uploaded files before they are actually saved.
+ * A repository holding uploaded files before they are actually saved.
  */
 interface UploadStore
 {
 
 	/**
 	 * The unique identifier under which the transaction is registered.
-	 * @param int $id
-	 * @return static
 	 */
-	function setId($id);
+	function setId(?int $id): self;
 
 
 
 	/**
 	 * The unique identifier under which the transaction is registered.
-	 * @return int
 	 */
-	function getId();
+	function getId(): int;
 
 
 
 	/**
 	 * @param string $filename Filename of uploaded file.
-	 * @return bool
 	 */
-	function exists($filename);
+	function exists(string $filename): bool;
 
 
 
 	/**
 	 * Move the uploaded file to the directory that represents the transaction. Returns the new location.
-	 *
-	 * @return FileUploaded
 	 */
-	function append(FileUpload $file);
+	function append(FileUpload $file): FileUploaded;
 
 
 
 	/**
 	 * Deleting a directory with a transaction.
-	 * @return void
 	 */
-	function destroy();
+	function destroy(): void;
+
+}
+
+
+
+/**
+ * We want to represent the uploaded file with a nice icon.
+ *
+ * @author Martin Takáč <martin@takac.name>
+ */
+interface FilePreviewer
+{
+
+	function getPreviewControlFor(FileUploaded | FileCurrent $val): Html;
+
+}
+
+
+
+interface FileValue
+{
 
 }
