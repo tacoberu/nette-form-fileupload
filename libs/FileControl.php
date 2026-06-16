@@ -10,6 +10,7 @@ namespace Taco\Nette\Forms\Controls;
 use Nette\Forms\Form;
 use Nette\Forms\Controls\UploadControl as NetteUploadControl;
 use Nette\Forms\Controls\SubmitButton;
+use Nette\Forms\Container;
 use Nette\Utils\Html;
 use Stringable;
 use LogicException;
@@ -29,6 +30,7 @@ use LogicException;
  */
 class FileControl extends NetteUploadControl
 {
+
 	const RemoveButtonLabel = "✕"; // &#x2715;
 
 	/**
@@ -68,6 +70,27 @@ class FileControl extends NetteUploadControl
 	 * @var Html
 	 */
 	private $transactionControl;
+
+	/**
+	 * Registers a form extension method `add{$name}` (default `addFileControl`),
+	 * which creates a FileControl with the store injected from the DI container.
+	 * The store can still be overridden by an explicit last argument.
+	 */
+	static function register(string $name = 'FileControl', ?UploadStore $store = Null): void
+	{
+		Container::extensionMethod('add' . $name, static function (
+			Container $container,
+			string $controlName,
+			string|Stringable|null $label = Null,
+			?UploadStore $localStore = Null
+		) use ($store): self {
+			$control = new self($label, $localStore ?: $store);
+			$container->addComponent($control, $controlName);
+			return $control;
+		});
+	}
+
+
 
 	function __construct(string|Stringable|null $label = null, ?UploadStore $store = Null)
 	{
