@@ -11,8 +11,8 @@ use Nette;
 use Nette\Utils\Html;
 use Nette\Forms\Form;
 use Nette\Forms\Container;
-use Nette\Forms\Controls\SubmitButton;
 use Nette\Forms\Controls\UploadControl as NetteUploadControl;
+use Nette\Forms\Controls\SubmitButton;
 use Stringable;
 use LogicException;
 
@@ -239,8 +239,20 @@ class MultiFileControl extends NetteUploadControl
 
 		$this->value = $values;
 
+		// No-JS fallback: the "↻" button submits the whole form. We process the upload
+		// (above), but suppress the form's submit handlers so onSuccess fires only on Save.
+		// Inspired by Contributte Multiplier's resetFormEvents(). With JS this path is not
+		// used - the button is intercepted and posted to the handlePreload() signal instead.
 		if ($this->getHttpData(Form::DataLine, '[preload]')) {
-			$this->form->setSubmittedBy((new SubmitButton())->setValidationScope([]));
+			$form = $this->getForm();
+			$button = new SubmitButton();
+			$button->setValidationScope([]);
+			// The clearing must happen inside onClick (runs before onSuccess), otherwise
+			// the form has "no associated handlers" and Nette warns.
+			$button->onClick[] = static function () use ($form): void {
+				$form->onSuccess = $form->onError = $form->onSubmit = [];
+			};
+			$form->setSubmittedBy($button);
 		}
 	}
 

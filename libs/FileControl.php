@@ -165,9 +165,19 @@ class FileControl extends NetteUploadControl
 			$this->value = null;
 		}
 
+		// No-JS fallback: the "✕" button submits the whole form. We drop the file (above),
+		// but suppress the form's submit handlers so onSuccess fires only on a real Save.
+		// The clearing must happen inside onClick (runs before onSuccess), otherwise the
+		// form has "no associated handlers" and Nette warns. See MultiFileControl::loadHttpData().
 		if ($this->getHttpData(Form::DataLine, '[remove]')) {
 			$this->value = null;
-			$this->form->setSubmittedBy((new SubmitButton())->setValidationScope([]));
+			$form = $this->getForm();
+			$button = new SubmitButton();
+			$button->setValidationScope([]);
+			$button->onClick[] = static function () use ($form): void {
+				$form->onSuccess = $form->onError = $form->onSubmit = [];
+			};
+			$form->setSubmittedBy($button);
 		}
 	}
 
