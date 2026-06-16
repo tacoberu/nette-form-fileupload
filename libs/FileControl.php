@@ -1,7 +1,8 @@
-<?php
+<?php declare(strict_types = 1);
+
 /**
  * Copyright (c) since 2004 Martin Takáč (http://martin.takac.name)
- * @license   https://opensource.org/licenses/MIT MIT
+ * @license https://opensource.org/licenses/MIT MIT
  */
 
 namespace Taco\Nette\Forms\Controls;
@@ -9,9 +10,8 @@ namespace Taco\Nette\Forms\Controls;
 use Nette\Forms\Form;
 use Nette\Forms\Controls\UploadControl as NetteUploadControl;
 use Nette\Forms\Controls\SubmitButton;
-use Nette\Http\FileUpload;
+use Nette\Forms\Container;
 use Nette\Utils\Html;
-use Stringable;
 use LogicException;
 
 
@@ -30,56 +30,84 @@ use LogicException;
 class FileControl extends NetteUploadControl
 {
 
+	const RemoveButtonLabel = "✕"; // &#x2715;
+
 	/**
 	 * A repository holding uploaded files before they are actually saved.
 	 * By default it's just a temp directory, see UploadStoreTemp
-	 *
-	 * @var UploadStore
+	 * @readonly
 	 */
-	private $store;
+	private UploadStore $store;
+
+	private ?FilePreviewer $previewer = Null;
 
 	/**
-	 * @var ?FilePreviewer
+	 * @readonly
 	 */
-	private $previewer = Null;
+	private Html $container;
 
 	/**
-	 * @var Html
+	 * @var Html remove button template
+	 * @readonly
 	 */
-	private $container;
+	private Html $removeButton;
 
 	/**
-	 * @var Html  remove button template
+	 * @var Html current file template
+	 * @readonly
 	 */
-	private $removeButton;
+	private Html $currentControl;
 
 	/**
-	 * @var Html  current file template
+	 * @readonly
 	 */
-	private $currentControl;
+	private Html $previewControl;
 
 	/**
-	 * @var Html
+	 * @readonly
 	 */
-	private $previewControl;
+	private Html $transactionControl;
+
+	private string $prefix = "taco-filecontrol";
 
 	/**
-	 * @var Html
+	 * Registers a form extension method `add{$name}` (default `addFileControl`),
+	 * which creates a FileControl with the store injected from the DI container.
+	 * The store can still be overridden by an explicit last argument.
 	 */
-	private $transactionControl;
+	static function register(string $name = 'FileControl', ?UploadStore $store = Null): void
+	{
+		Container::extensionMethod('add' . $name, static function (
+			Container $container,
+			string $controlName,
+			$label = Null,
+			?UploadStore $localStore = Null
+		) use ($store): self {
+			$control = new self($label, $localStore ?: $store);
+			$container->addComponent($control, $controlName);
+			return $control;
+		});
+	}
 
 
-	function __construct(string|Stringable|null $label = null, UploadStore $store = Null)
+
+	/**
+	 * @param string|null $label
+	 */
+	function __construct($label = null, ?UploadStore $store = Null)
 	{
 		parent::__construct($label, false);
+
 		$this->setHtmlAttribute('data-taco-type', 'file');
-		$this->store = (!empty($store)) ? $store : new UploadStoreTemp();
+		$this->store = $store instanceof UploadStore
+			? $store
+			: new UploadStoreTemp();
 		$this->container = Html::el('div', [
-			'class' => 'taco-file-control',
+			'class' => $this->formatClass(Null),
 		]);
 		$this->removeButton = Html::el('input', [
 			'type' => 'submit',
-			'value' => $this->translate('x'),
+			'value' => $this->translate(self::RemoveButtonLabel),
 			'title' => $this->translate('Remove'),
 			'formnovalidate' => '',
 		]);
@@ -99,9 +127,8 @@ class FileControl extends NetteUploadControl
 
 	/**
 	 * By setting the previewer, uploaded files will be represented by their respective previews.
-	 * @return self
 	 */
-	function setPreviewer(FilePreviewer $var)
+	function setPreviewer(FilePreviewer $var): self
 	{
 		$this->previewer = $var;
 		return $this;
@@ -111,13 +138,12 @@ class FileControl extends NetteUploadControl
 
 	/**
 	 * Loads HTTP data. File moved to transaction.
-	 *
-	 * @return void
 	 */
 	function loadHttpData(): void
 	{
 		// When I add a new Upload to the running request, the transaction number is missing
-		$this->store->setId($this->getHttpData(Form::DataLine, '[transaction]'));
+		$id = $this->getHttpData(Form::DataLine, '[transaction]');
+		$this->store->setId($id ? (int) $id : Null);
 
 		if ($file = $this->getHttpData(Form::DataFile, '[new]')) {
 			if ($file->isOk()) {
@@ -131,20 +157,27 @@ class FileControl extends NetteUploadControl
 		elseif ($rawvalue = $this->getHttpData(Form::DataText, '[current]')) {
 			$value = Utils::createFileUploadedFromValue($rawvalue);
 			// If it's in the store, it's not committed. How else would he get here?
-			if ($this->store->exists($value->getId())) {
-				$this->value = $value;
-			}
-			else {
-				$this->value = Utils::createFileCurrentFromValue($rawvalue);
-			}
+			$this->value = $this->store->exists($value->getId())
+				? $value
+				: Utils::createFileCurrentFromValue($rawvalue);
 		}
 		else {
 			$this->value = null;
 		}
 
+		// No-JS fallback: the "✕" button submits the whole form. We drop the file (above),
+		// but suppress the form's submit handlers so onSuccess fires only on a real Save.
+		// The clearing must happen inside onClick (runs before onSuccess), otherwise the
+		// form has "no associated handlers" and Nette warns. See MultiFileControl::loadHttpData().
 		if ($this->getHttpData(Form::DataLine, '[remove]')) {
 			$this->value = null;
-			$this->form->setSubmittedBy((new SubmitButton())->setValidationScope([]));
+			$form = $this->getForm();
+			$button = new SubmitButton();
+			$button->setValidationScope([]);
+			$button->onClick[] = static function () use ($form): void {
+				$form->onSuccess = $form->onError = $form->onSubmit = [];
+			};
+			$form->setSubmittedBy($button);
 		}
 	}
 
@@ -183,10 +216,7 @@ class FileControl extends NetteUploadControl
 
 
 
-	/**
-	 * @return static
-	 */
-	function setValue($value)
+	function setValue($value): self
 	{
 		if ($value instanceof FileCurrent) {
 			$this->value = clone $value;
@@ -222,7 +252,7 @@ class FileControl extends NetteUploadControl
 					->addHtml($this->getCurrentPart($name, $this->value))
 					->addHtml($this->getPreviewControlPart($this->value))
 					->addHtml($this->getRemoveButtonPart($name))
-					->addHtml($this->getNewControlPart($name, withoutRequired: True))
+					->addHtml($this->getNewControlPart($name, True))
 					->addHtml($this->getTransactionControlPart($name));
 
 			// No file selected
@@ -232,7 +262,7 @@ class FileControl extends NetteUploadControl
 				$name = $this->getHtmlName();
 				$container = clone $this->container;
 				return $container
-					->addHtml($this->getNewControlPart($name, withoutRequired: False))
+					->addHtml($this->getNewControlPart($name, False))
 					->addHtml($this->getTransactionControlPart($name));
 
 			default:
@@ -281,7 +311,10 @@ class FileControl extends NetteUploadControl
 
 
 
-	function getCurrentPart(string $name, FileUploaded|FileCurrent $value): Html
+	/**
+	 * @param FileUploaded | FileCurrent $value
+	 */
+	function getCurrentPart(string $name, $value): Html
 	{
 		$el = clone $this->currentControl;
 		$el->value = Utils::serializeFile($value);
@@ -298,9 +331,12 @@ class FileControl extends NetteUploadControl
 
 
 
-	function getPreviewControlPart(FileUploaded|FileCurrent $src): Html
+	/**
+	 * @param FileUploaded | FileCurrent $src
+	 */
+	function getPreviewControlPart($src): Html
 	{
-		if (empty($this->previewer)) {
+		if (!$this->previewer instanceof FilePreviewer) {
 			$el = clone $this->previewControl;
 			$el->value = $src->getName();
 			return $el;
@@ -334,6 +370,15 @@ class FileControl extends NetteUploadControl
 		$el->name = $name . '[transaction]';
 		$el->value = (string) $this->store->getId();
 		return $el;
+	}
+
+
+
+	private function formatClass(?string $suffix): string
+	{
+		return $suffix
+			? "{$this->prefix}-{$suffix}"
+			: $this->prefix;
 	}
 
 }

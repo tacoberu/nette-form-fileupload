@@ -1,7 +1,8 @@
-<?php
+<?php declare(strict_types = 1);
+
 /**
  * Copyright (c) since 2004 Martin Takáč (http://martin.takac.name)
- * @license   https://opensource.org/licenses/MIT MIT
+ * @license https://opensource.org/licenses/MIT MIT
  */
 
 namespace Taco\Nette\Forms\Controls;
@@ -16,8 +17,9 @@ class Utils
 
 	/**
 	 * @return string 'image/jpeg#tasks/6s3qva8l/4728-05.jpg'
+	 * @param \Taco\Nette\Forms\Controls\FileUploaded|\Taco\Nette\Forms\Controls\FileCurrent $src
 	 */
-	static function serializeFile(FileUploaded|FileCurrent $src): string
+	static function serializeFile($src): string
 	{
 		return $src->getContentType() . '#' . $src->getId();
 	}

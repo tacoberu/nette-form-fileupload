@@ -1,21 +1,19 @@
-<?php
+<?php declare(strict_types = 1);
+
 /**
  * Copyright (c) since 2004 Martin Takáč (http://martin.takac.name)
- * @license   https://opensource.org/licenses/MIT MIT
+ * @license https://opensource.org/licenses/MIT MIT
  */
 
 namespace Taco\Nette\Forms\Controls;
 
-use Nette,
-	Nette\Utils\Html,
-	Nette\Utils\Validators,
-	Nette\Forms\Form,
-	Nette\Forms\Controls\BaseControl,
-	Nette\Forms\Controls\SubmitButton,
-	Nette\Forms\Controls\UploadControl as NetteUploadControl,
-	Nette\Http\FileUpload;
+use Nette;
+use Nette\Utils\Html;
+use Nette\Forms\Form;
+use Nette\Forms\Container;
+use Nette\Forms\Controls\UploadControl as NetteUploadControl;
+use Nette\Forms\Controls\SubmitButton;
 use LogicException;
-use Stringable;
 
 
 /**
@@ -36,62 +34,89 @@ class MultiFileControl extends NetteUploadControl
 	/**
 	 * A repository holding uploaded files before they are actually saved.
 	 * By default it's just a temp directory, see UploadStoreTemp
-	 *
-	 * @var UploadStore
+	 * @readonly
 	 */
-	private $store;
+	private UploadStore $store;
+
+	private ?FilePreviewer $previewer = Null;
 
 	/**
-	 * @var ?FilePreviewer
+	 * @readonly
 	 */
-	private $previewer = Null;
+	private Html $container;
 
 	/**
-	 * @var Html
+	 * @readonly
 	 */
-	private $container;
+	private Html $itemControl;
 
 	/**
-	 * @var Html
+	 * @readonly
 	 */
-	private $itemControl;
+	private Html $useCheckbox;
 
 	/**
-	 * @var Html
+	 * @var Html current file template
+	 * @readonly
 	 */
-	private $useCheckbox;
+	private Html $currentControl;
 
 	/**
-	 * @var Html  current file template
+	 * @readonly
 	 */
-	private $currentControl;
+	private Html $previewControl;
 
 	/**
-	 * @var Html
+	 * @readonly
 	 */
-	private $previewControl;
+	private Html $labelControl;
 
 	/**
-	 * @var Html
+	 * @readonly
 	 */
-	private $transactionControl;
+	private Html $transactionControl;
 
 	/**
-	 * @var Html
+	 * @readonly
 	 */
-	private $preloadButton;
+	private Html $preloadButton;
+
+	private string $prefix = "taco-filecontrol";
+
+	/**
+	 * Registers a form extension method `addMulti{$name}` (default `addMultiFileControl`),
+	 * which creates a MultiFileControl with the store injected from the DI container.
+	 * The store can still be overridden by an explicit last argument.
+	 */
+	static function register(string $name = 'FileControl', ?UploadStore $store = Null): void
+	{
+		Container::extensionMethod('addMulti' . $name, static function (
+			Container $container,
+			string $controlName,
+			$label = Null,
+			?UploadStore $localStore = Null
+		) use ($store): self {
+			$control = new self($label, $localStore ?: $store);
+			$container->addComponent($control, $controlName);
+			return $control;
+		});
+	}
 
 
-	function __construct(string|Stringable|null $label = null, UploadStore $store = Null)
+
+	/**
+	 * @param string|null $label
+	 */
+	function __construct($label = null, ?UploadStore $store = Null)
 	{
 		parent::__construct($label);
+
 		$this->container = Html::el('div', [
-			'data-taco-type' => 'file',
-			'class' => 'taco-file-control taco-multifile-control',
-			//~ 'style' => 'border: 1px solid red',
+			'data-taco-type' => 'file multiple',
+			'class' => $this->formatClass(Null) . ' ' . $this->formatClass('multiple'),
 		]);
 		$this->itemControl = Html::el('div', [
-			//~ 'style' => 'border: 1px solid green',
+			'class' => $this->formatClass('row'),
 		]);
 		$this->useCheckbox = Html::el('input', [
 			'type' => 'checkbox',
@@ -105,18 +130,24 @@ class MultiFileControl extends NetteUploadControl
 		$this->previewControl = Html::el('input', [
 			'readonly' => 1,
 		]);
+		$this->labelControl = Html::el('span', [
+		]);
 		$this->transactionControl = Html::el('input', [
 			'type' => 'hidden',
 		]);
 		$this->preloadButton = Html::el('input', [
 			'type' => 'submit',
-			'value' => $this->translate('Preload'),
+			'value' => $this->translate('↻'),
+			'class' => $this->formatClass('preload'),
+			'title' => $this->translate('Preload'),
 			'formnovalidate' => '',
 		]);
 
-		$this->store = (!empty($store)) ? $store : new UploadStoreTemp();
+		$this->store = $store instanceof UploadStore
+			? $store
+			: new UploadStoreTemp();
 
-		$this->monitor(Form::class, function (Form $form): void {
+		$this->monitor(Form::class, static function (Form $form): void {
 			if ( ! $form->isMethod('post')) {
 				throw new Nette\InvalidStateException('File upload requires method POST.');
 			}
@@ -128,9 +159,8 @@ class MultiFileControl extends NetteUploadControl
 
 	/**
 	 * By setting the previewer, uploaded files will be represented by their respective previews.
-	 * @return self
 	 */
-	function setPreviewer(FilePreviewer $var)
+	function setPreviewer(FilePreviewer $var): self
 	{
 		$this->previewer = $var;
 		return $this;
@@ -159,7 +189,7 @@ class MultiFileControl extends NetteUploadControl
 
 	/**
 	 * Returning values.
-	 * @return array<FileUploaded|FileCurrent>
+	 * @return array<FileUploaded | FileCurrent>
 	 */
 	function getValue()
 	{
@@ -170,13 +200,12 @@ class MultiFileControl extends NetteUploadControl
 
 	/**
 	 * Loads HTTP data. Files moved to transaction.
-	 *
-	 * @return void
 	 */
-	function loadHttpData() : void
+	function loadHttpData(): void
 	{
 		// When I add a new Upload to the running request, the transaction number is missing
-		$this->store->setId($this->getHttpData(Form::DataLine, '[transaction]'));
+		$id = $this->getHttpData(Form::DataLine, '[transaction]');
+		$this->store->setId($id ? (int) $id : Null);
 
 		// Odškrtnutí znamená vyhodit.
 		$used = $this->getHttpData(Form::DataLine, '[use][]');
@@ -189,12 +218,9 @@ class MultiFileControl extends NetteUploadControl
 				}
 				$value = Utils::createFileUploadedFromValue($rawvalue);
 				// If it's in the store, it's not committed. How else would he get here?
-				if ($this->store->exists($value->getId())) {
-					$values[] = $value;
-				}
-				else {
-					$values[] = Utils::createFileCurrentFromValue($rawvalue);
-				}
+				$values[] = $this->store->exists($value->getId())
+					? $value
+					: Utils::createFileCurrentFromValue($rawvalue);
 			}
 		}
 
@@ -212,8 +238,20 @@ class MultiFileControl extends NetteUploadControl
 
 		$this->value = $values;
 
+		// No-JS fallback: the "↻" button submits the whole form. We process the upload
+		// (above), but suppress the form's submit handlers so onSuccess fires only on Save.
+		// Inspired by Contributte Multiplier's resetFormEvents(). With JS this path is not
+		// used - the button is intercepted and posted to the handlePreload() signal instead.
 		if ($this->getHttpData(Form::DataLine, '[preload]')) {
-			$this->form->setSubmittedBy((new SubmitButton())->setValidationScope([]));
+			$form = $this->getForm();
+			$button = new SubmitButton();
+			$button->setValidationScope([]);
+			// The clearing must happen inside onClick (runs before onSuccess), otherwise
+			// the form has "no associated handlers" and Nette warns.
+			$button->onClick[] = static function () use ($form): void {
+				$form->onSuccess = $form->onError = $form->onSubmit = [];
+			};
+			$form->setSubmittedBy($button);
 		}
 	}
 
@@ -231,8 +269,9 @@ class MultiFileControl extends NetteUploadControl
 		foreach ($this->value as $item) {
 			$container->addHtml($this->getItemControlPart($name, $item));
 		}
-		$container->addHtml($this->getItemControlPart($name, Null));
-		$container->addHtml($this->getPreloadButtonPart($name));
+		$row = $this->getItemControlPart($name, Null);
+		$row->addHtml($this->getPreloadButtonPart($name));
+		$container->addHtml($row);
 		$container->addHtml($this->getTransactionControlPart($name));
 
 		return $container;
@@ -240,23 +279,40 @@ class MultiFileControl extends NetteUploadControl
 
 
 
-	private function getItemControlPart(string $name, FileUploaded|FileCurrent|Null $value): Html
+	/**
+	 * Have been all files successfully uploaded?
+	 */
+	function isOk(): bool
 	{
-		$el = clone $this->itemControl;
-		if (empty($value)) {
-			$el->addHtml($this->getNewControlPart($name, withoutRequired: False));
-		}
-		else {
-			$el->addHtml($this->getUseCheckboxPart($name, $value));
-			$el->addHtml($this->getCurrentPart($name, $value));
-			$el->addHtml($this->getPreviewControlPart($value));
-		}
-		return $el;
+		return True;
 	}
 
 
 
-	function getCurrentPart(string $name, FileUploaded|FileCurrent $value): Html
+	/**
+	 * Has been any file uploaded?
+	 */
+	function isFilled(): bool
+	{
+		return !empty($this->value);
+	}
+
+
+
+	/**
+	 * Odstranění adresáře s transakcí.
+	 */
+	function destroyStore(): void
+	{
+		$this->store->destroy();
+	}
+
+
+
+	/**
+	 * @param FileUploaded | FileCurrent $value
+	 */
+	private function getCurrentPart(string $name, $value): Html
 	{
 		$el = clone $this->currentControl;
 		$el->value = Utils::serializeFile($value);
@@ -266,9 +322,12 @@ class MultiFileControl extends NetteUploadControl
 
 
 
-	function getPreviewControlPart(FileUploaded|FileCurrent $src): Html
+	/**
+	 * @param FileUploaded | FileCurrent $src
+	 */
+	private function getPreviewControlPart($src): Html
 	{
-		if (empty($this->previewer)) {
+		if (!$this->previewer instanceof FilePreviewer) {
 			$el = clone $this->previewControl;
 			$el->value = $src->getName();
 			return $el;
@@ -278,11 +337,57 @@ class MultiFileControl extends NetteUploadControl
 
 
 
-	function getUseCheckboxPart(string $name, FileUploaded|FileCurrent $src): Html
+	/**
+	 * @param FileUploaded | FileCurrent $src
+	 */
+	private function getLabelControlPart($src): Html
+	{
+		$el = clone $this->labelControl;
+		$el->setText($src->getName());
+		return $el;
+	}
+
+
+
+	/**
+	 * @param FileUploaded | FileCurrent $src
+	 */
+	private function getUseCheckboxPart(string $name, $src): Html
 	{
 		$el = clone $this->useCheckbox;
 		$el->name = $name . '[use][]';
 		$el->value = Utils::serializeFile($src);
+		// The name/value must sit on the checkbox itself, otherwise it is not submitted.
+		return Html::el('label')->addHtml($el);
+	}
+
+
+
+	private function getPreloadButtonPart(string $name): Html
+	{
+		$el = clone $this->preloadButton;
+		$el->name = $name . '[preload]';
+		return $el;
+	}
+
+
+
+	/**
+	 * @param FileUploaded | FileCurrent | null $value
+	 */
+	private function getItemControlPart(string $name, $value): Html
+	{
+		$el = clone $this->itemControl;
+		if (empty($value)) {
+			$el->addHtml($this->getNewControlPart($name, False));
+			$el->appendAttribute("class", $this->formatClass('upload'));
+		}
+		else {
+			$el->addHtml($this->getUseCheckboxPart($name, $value));
+			$el->addHtml($this->getCurrentPart($name, $value));
+			$el->addHtml($this->getPreviewControlPart($value));
+			$el->addHtml($this->getLabelControlPart($value));
+		}
 		return $el;
 	}
 
@@ -307,15 +412,6 @@ class MultiFileControl extends NetteUploadControl
 
 
 
-	function getPreloadButtonPart(string $name): Html
-	{
-		$el = clone $this->preloadButton;
-		$el->name = $name . '[preload]';
-		return $el;
-	}
-
-
-
 	private function getTransactionControlPart(string $name): Html
 	{
 		$el = clone $this->transactionControl;
@@ -326,40 +422,19 @@ class MultiFileControl extends NetteUploadControl
 
 
 
-	/**
-	 * Have been all files successfully uploaded?
-	 */
-	function isOk(): bool
+	private function formatClass(?string $suffix): string
 	{
-		return True;
-	}
-
-
-
-	/**
-	 * Has been any file uploaded?
-	 */
-	function isFilled(): bool
-	{
-		if (empty($this->value)) {
-			return False;
-		}
-		return True;
-	}
-
-
-
-	/**
-	 * Odstranění adresáře s transakcí.
-	 */
-	function destroyStore(): void
-	{
-		$this->store->destroy();
+		return $suffix
+			? "{$this->prefix}-{$suffix}"
+			: $this->prefix;
 	}
 
 
 
 	private static function assertFileValue(FileCurrent $m): void
 	{
+		// The parameter type-hint already guarantees the value;
+		// kept as an extension point for stricter checks.
 	}
+
 }
