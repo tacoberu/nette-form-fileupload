@@ -12,7 +12,6 @@ use Nette\Utils\Strings;
 use Nette\Http\FileUpload;
 use FilesystemIterator;
 use RuntimeException;
-use FilesystemIterator;
 
 
 /**
@@ -25,41 +24,32 @@ class UploadStoreTemp implements UploadStore
 	/**
 	 * We subtract this from NOW() so that the number is not so large.
 	 */
-	const EPOCH_START = 13866047000000;
+	public const EPOCH_START = 13866047000000;
 
 	/**
 	 * A string to prefix the directory for storing files.
 	 * "/tmp/upload-669932181976"
 	 */
-	const PREFIX = 'upload-';
+	public const PREFIX = 'upload-';
 
 	/**
 	 * "/tmp/upload-669932181976"
-	 * @var string
 	 */
-	private $prefix = self::PREFIX;
+	private string $prefix = self::PREFIX;
 
 	/**
 	 * The unique identifier under which the transaction is registered.
-	 * @var int
 	 */
-	private $id;
+	private ?int $id = null;
 
-	/**
-	 * @var ?string
-	 */
-	private $baseDir;
+	private ?string $baseDir;
 
 	/**
 	 * 60 = minute
-	 * @var int
 	 */
-	private $gcLimit;
+	private int $gcLimit;
 
-	/**
-	 * @var int
-	 */
-	private $gcMaxCount;
+	private int $gcMaxCount;
 
 	/**
 	 * In sec
@@ -127,16 +117,20 @@ class UploadStoreTemp implements UploadStore
 
 
 
-	function setId($id)
+	function setId(?int $id): self
 	{
+		// An empty transaction (e.g. a partial request) is ignored - getId() generates a fresh one.
+		if (empty($id)) {
+			return $this;
+		}
 		Validators::assert($id, 'numeric:1..');
-		$this->id = (int)$id;
+		$this->id = (int) $id;
 		return $this;
 	}
 
 
 
-	function getId()
+	function getId(): int
 	{
 		if (empty($this->id)) {
 			$this->id = self::generateId();
@@ -146,14 +140,14 @@ class UploadStoreTemp implements UploadStore
 
 
 
-	function exists($filename)
+	function exists($filename): bool
 	{
 		return file_exists($filename);
 	}
 
 
 
-	function append(FileUpload $file)
+	function append(FileUpload $file): FileUploaded
 	{
 		$path = $this->getTransactionDir();
 		$path[] = $file->sanitizedName;
@@ -171,7 +165,7 @@ class UploadStoreTemp implements UploadStore
 
 
 
-	function destroy()
+	function destroy(): void
 	{
 		$dir = implode(DIRECTORY_SEPARATOR, $this->getTransactionDir());
 		if (file_exists($dir)) {
@@ -191,7 +185,7 @@ class UploadStoreTemp implements UploadStore
 	/**
 	 * @return array<string>
 	 */
-	private function getTransactionDir()
+	private function getTransactionDir(): array
 	{
 		return [$this->getBaseDir()
 			, $this->prefix . $this->getId(),
@@ -200,10 +194,7 @@ class UploadStoreTemp implements UploadStore
 
 
 
-	/**
-	 * @return string
-	 */
-	private function getBaseDir()
+	private function getBaseDir(): string
 	{
 		return $this->baseDir ?: sys_get_temp_dir();
 	}
@@ -218,12 +209,10 @@ class UploadStoreTemp implements UploadStore
 
 
 	/**
-	 * Deletes a file or directory.
-	 * @param string $path
-	 * @return void
-	 * @throws RuntimeException
-	 */
-	private static function delete($path)
+	* Deletes a file or directory.
+	* @throws RuntimeException
+	*/
+	private static function delete(string $path): void
 	{
 		if (is_file($path) || is_link($path)) {
 			$func = DIRECTORY_SEPARATOR === '\\' && is_dir($path)

@@ -46,11 +46,23 @@ class UploadStoreTempTest extends TestCase
 
 
 
-	function testSetIdRejectsNonNumeric()
+	function testSetIdRejectsNonPositiveId()
 	{
 		$store = new UploadStoreTemp(gcAgeLimit: 0);
 		$this->expectException(AssertionException::class);
-		$store->setId('not-a-number');
+		$store->setId(-1);
+	}
+
+
+
+	function testSetIdIgnoresEmptyTransaction()
+	{
+		$store = new UploadStoreTemp(gcAgeLimit: 0);
+		// An empty transaction (0/null, e.g. a partial request) is ignored;
+		// a fresh id is generated instead.
+		$this->assertSame($store, $store->setId(0));
+		$this->assertSame($store, $store->setId(Null));
+		$this->assertGreaterThan(0, $store->getId());
 	}
 
 
