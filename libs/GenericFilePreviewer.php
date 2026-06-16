@@ -1,15 +1,14 @@
-<?php
+<?php declare(strict_types = 1);
+
 /**
  * Copyright (c) since 2004 Martin Takáč (http://martin.takac.name)
- * @license   https://opensource.org/licenses/MIT MIT
+ * @license https://opensource.org/licenses/MIT MIT
  */
 
 namespace Taco\Nette\Forms\Controls;
 
-use LogicException;
 use Nette\Utils\Html;
 use Nette\Utils\Image;
-use Nette\Utils\ImageColor;
 use Nette\Utils\ImageType;
 
 
@@ -46,7 +45,6 @@ class GenericFilePreviewer implements FilePreviewer
 	 */
 	private $format = ImageType::JPEG;
 
-
 	function getPreviewControlFor(FileUploaded|FileCurrent $val): Html
 	{
 		if (self::isImageTypeByFilename($val->getId())) {
@@ -70,14 +68,7 @@ class GenericFilePreviewer implements FilePreviewer
 	private static function isImageTypeByFilename(string $file): bool
 	{
 		$ext = self::getFileExtension($file);
-		if (!in_array($ext, [
-				'jpeg', 'jpg', 'jpe',
-				'gif',
-				'png',
-				'webp',
-				'avif',
-				'bmp',
-				], True)) {
+		if (!in_array($ext, ['jpeg', 'jpg', 'jpe', 'gif', 'png', 'webp', 'avif', 'bmp',], True)) {
 			return False;
 		}
 		return Image::isTypeSupported(Image::extensionToType($ext));

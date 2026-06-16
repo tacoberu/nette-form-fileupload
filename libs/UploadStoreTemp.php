@@ -1,16 +1,18 @@
-<?php
+<?php declare(strict_types = 1);
+
 /**
  * Copyright (c) since 2004 Martin Takáč (http://martin.takac.name)
- * @license   https://opensource.org/licenses/MIT MIT
+ * @license https://opensource.org/licenses/MIT MIT
  */
 
 namespace Taco\Nette\Forms\Controls;
 
-use Nette,
-	Nette\Utils\Validators,
-	Nette\Utils\Strings,
-	Nette\Http\FileUpload;
+use Nette\Utils\Validators;
+use Nette\Utils\Strings;
+use Nette\Http\FileUpload;
+use FilesystemIterator;
 use RuntimeException;
+use FilesystemIterator;
 
 
 /**
@@ -25,13 +27,11 @@ class UploadStoreTemp implements UploadStore
 	 */
 	const EPOCH_START = 13866047000000;
 
-
 	/**
 	 * A string to prefix the directory for storing files.
 	 * "/tmp/upload-669932181976"
 	 */
 	const PREFIX = 'upload-';
-
 
 	/**
 	 * "/tmp/upload-669932181976"
@@ -60,7 +60,6 @@ class UploadStoreTemp implements UploadStore
 	 * @var int
 	 */
 	private $gcMaxCount;
-
 
 	/**
 	 * In sec
@@ -97,6 +96,33 @@ class UploadStoreTemp implements UploadStore
 		$this->baseDir = $baseDir;
 		$this->gcLimit = $gcAgeLimit;
 		$this->gcMaxCount = $gcMaxCount;
+	}
+
+
+
+	/**
+	 * It will serve as a GC for erasing old records.
+	 */
+	function __destruct()
+	{
+		if (empty($this->gcLimit)) {
+			return;
+		}
+		$path = implode('/', array_merge([$this->getBaseDir()], array_slice(explode('/', $this->prefix), 0, -1)));
+		$pathWithPrefix = $this->getBaseDir() . DIRECTORY_SEPARATOR . $this->prefix;
+		$count = $this->gcMaxCount;
+		foreach (new FilesystemIterator($path) as $item) {
+			$item = (string) $item;
+			if (Strings::startsWith($item, $pathWithPrefix)) {
+				if ($count-- < 0) {
+					break;
+				}
+				$id = (int) substr($item, strlen($pathWithPrefix));
+				if ($id !== $this->id && $this->itIsOld($id)) {
+					self::delete($item);
+				}
+			}
+		}
 	}
 
 
@@ -155,32 +181,6 @@ class UploadStoreTemp implements UploadStore
 
 
 
-	/**
-	 * It will serve as a GC for erasing old records.
-	 */
-	function __destruct()
-	{
-		if (empty($this->gcLimit)) {
-			return;
-		}
-		$path = implode('/', array_merge([$this->getBaseDir()], array_slice(explode('/', $this->prefix), 0, -1)));
-		$pathWithPrefix = $this->getBaseDir() . DIRECTORY_SEPARATOR . $this->prefix;
-		$count = $this->gcMaxCount;
-		foreach (new \FilesystemIterator($path) as $item) {
-			if (Strings::startsWith($item, $pathWithPrefix)) {
-				if ($count-- < 0) {
-					break;
-				}
-				$id = (int) substr($item, strlen($pathWithPrefix));
-				if ($id != $this->id && $this->itIsOld($id)) {
-					self::delete($item);
-				}
-			}
-		}
-	}
-
-
-
 	private function itIsOld(int $id): bool
 	{
 		return self::calculateAgeOfId($id) > $this->gcLimit;
@@ -194,7 +194,7 @@ class UploadStoreTemp implements UploadStore
 	private function getTransactionDir()
 	{
 		return [$this->getBaseDir()
-			, $this->prefix . $this->getId()
+			, $this->prefix . $this->getId(),
 		];
 	}
 
@@ -226,7 +226,9 @@ class UploadStoreTemp implements UploadStore
 	private static function delete($path)
 	{
 		if (is_file($path) || is_link($path)) {
-			$func = DIRECTORY_SEPARATOR === '\\' && is_dir($path) ? 'rmdir' : 'unlink';
+			$func = DIRECTORY_SEPARATOR === '\\' && is_dir($path)
+				? 'rmdir'
+				: 'unlink';
 
 			// @ is escalated to exception
 			if ( ! @$func($path)) {
@@ -234,7 +236,7 @@ class UploadStoreTemp implements UploadStore
 			}
 		}
 		elseif (is_dir($path)) {
-			foreach (new \FilesystemIterator($path) as $item) {
+			foreach (new FilesystemIterator($path) as $item) {
 				self::delete((string) $item);
 			}
 

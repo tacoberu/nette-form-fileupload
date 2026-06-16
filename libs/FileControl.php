@@ -1,7 +1,8 @@
-<?php
+<?php declare(strict_types = 1);
+
 /**
  * Copyright (c) since 2004 Martin Takáč (http://martin.takac.name)
- * @license   https://opensource.org/licenses/MIT MIT
+ * @license https://opensource.org/licenses/MIT MIT
  */
 
 namespace Taco\Nette\Forms\Controls;
@@ -9,7 +10,6 @@ namespace Taco\Nette\Forms\Controls;
 use Nette\Forms\Form;
 use Nette\Forms\Controls\UploadControl as NetteUploadControl;
 use Nette\Forms\Controls\SubmitButton;
-use Nette\Http\FileUpload;
 use Nette\Utils\Html;
 use Stringable;
 use LogicException;
@@ -49,12 +49,12 @@ class FileControl extends NetteUploadControl
 	private $container;
 
 	/**
-	 * @var Html  remove button template
+	 * @var Html remove button template
 	 */
 	private $removeButton;
 
 	/**
-	 * @var Html  current file template
+	 * @var Html current file template
 	 */
 	private $currentControl;
 
@@ -68,12 +68,14 @@ class FileControl extends NetteUploadControl
 	 */
 	private $transactionControl;
 
-
-	function __construct(string|Stringable|null $label = null, UploadStore $store = Null)
+	function __construct(string|Stringable|null $label = null, ?UploadStore $store = Null)
 	{
 		parent::__construct($label, false);
+
 		$this->setHtmlAttribute('data-taco-type', 'file');
-		$this->store = (!empty($store)) ? $store : new UploadStoreTemp();
+		$this->store = !empty($store)
+			? $store
+			: new UploadStoreTemp();
 		$this->container = Html::el('div', [
 			'class' => 'taco-file-control',
 		]);
@@ -111,8 +113,6 @@ class FileControl extends NetteUploadControl
 
 	/**
 	 * Loads HTTP data. File moved to transaction.
-	 *
-	 * @return void
 	 */
 	function loadHttpData(): void
 	{
@@ -131,12 +131,9 @@ class FileControl extends NetteUploadControl
 		elseif ($rawvalue = $this->getHttpData(Form::DataText, '[current]')) {
 			$value = Utils::createFileUploadedFromValue($rawvalue);
 			// If it's in the store, it's not committed. How else would he get here?
-			if ($this->store->exists($value->getId())) {
-				$this->value = $value;
-			}
-			else {
-				$this->value = Utils::createFileCurrentFromValue($rawvalue);
-			}
+			$this->value = $this->store->exists($value->getId())
+				? $value
+				: Utils::createFileCurrentFromValue($rawvalue);
 		}
 		else {
 			$this->value = null;
@@ -321,7 +318,7 @@ class FileControl extends NetteUploadControl
 		// Existenci validujeme podle $name[current], ale nový záznam podle $name[new].
 		if ($withoutRequired) {
 			unset($el->required);
-			$el->setAttribute('data-nette-rules', Utils::removeFilledRules($el->getAttribute('data-nette-rules')));
+			$el->setAttribute('data-nette-rules', Utils::removeFilledRules($el->getAttribute('data-nette-rules') ?? []));
 		}
 		return $el;
 	}
