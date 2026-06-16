@@ -29,6 +29,7 @@ use LogicException;
  */
 class FileControl extends NetteUploadControl
 {
+	const RemoveButtonLabel = "✕"; // &#x2715;
 
 	/**
 	 * A repository holding uploaded files before they are actually saved.
@@ -81,7 +82,7 @@ class FileControl extends NetteUploadControl
 		]);
 		$this->removeButton = Html::el('input', [
 			'type' => 'submit',
-			'value' => $this->translate('x'),
+			'value' => $this->translate(self::RemoveButtonLabel),
 			'title' => $this->translate('Remove'),
 			'formnovalidate' => '',
 		]);
