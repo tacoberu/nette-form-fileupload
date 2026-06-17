@@ -15,102 +15,37 @@ class FileCurrentTest extends TestCase
 
 	function testFreshFileWithDerivedName()
 	{
-		$inst = new FileCurrent("uploaded/account/56695/mp16.jpg", "image/jpeg");
-		$this->assertStatus(
-			$inst,
-			name: 'mp16.jpg',
-			path: 'uploaded/account/56695/mp16.jpg',
-			contentType: 'image/jpeg',
-			remove: False,
-			filled: True
-		);
+		$inst = new FileCurrent("uploaded/account/56695/mp16.jpg", "image/jpeg", 0);
+		$this->assertSame('mp16.jpg', $inst->getName());
+		$this->assertSame('uploaded/account/56695/mp16.jpg', $inst->getId());
+		$this->assertSame('image/jpeg', $inst->getContentType());
+		$this->assertSame(0, $inst->getSize());
 	}
 
 
 
 	function testFreshFileWithExplicitName()
 	{
-		$inst = new FileCurrent("uploaded/account/56695/mp16.jpg", "image/jpeg", "portrait.jpg");
-		$this->assertStatus(
-			$inst,
-			name: 'portrait.jpg',
-			path: 'uploaded/account/56695/mp16.jpg',
-			contentType: 'image/jpeg',
-			remove: False,
-			filled: True
-		);
+		$inst = new FileCurrent("uploaded/account/56695/mp16.jpg", "image/jpeg", 0, "portrait.jpg");
+		$this->assertSame('portrait.jpg', $inst->getName());
+		$this->assertSame('uploaded/account/56695/mp16.jpg', $inst->getId());
+		$this->assertSame('image/jpeg', $inst->getContentType());
 	}
 
 
 
 	function testEmptyNameFallsBackToBasename()
 	{
-		$inst = new FileCurrent("uploaded/account/56695/mp16.jpg", "image/jpeg", '');
-		$this->assertStatus(
-			$inst,
-			name: 'mp16.jpg',
-			path: 'uploaded/account/56695/mp16.jpg',
-			contentType: 'image/jpeg',
-			remove: False,
-			filled: True
-		);
+		$inst = new FileCurrent("uploaded/account/56695/mp16.jpg", "image/jpeg", 0, '');
+		$this->assertSame('mp16.jpg', $inst->getName());
 	}
 
 
 
-	function testRemovedFile()
+	function testSizeIsStored()
 	{
-		$inst = new FileCurrent("uploaded/account/56695/mp16.jpg", "image/jpeg");
-		$this->assertSame($inst, $inst->setRemove(), 'setRemove() is fluent');
-		$this->assertStatus(
-			$inst,
-			name: 'mp16.jpg',
-			path: 'uploaded/account/56695/mp16.jpg',
-			contentType: 'image/jpeg',
-			remove: True,
-			filled: False
-		);
-	}
-
-
-
-	function testExplicitlyKeptFile()
-	{
-		$inst = new FileCurrent("uploaded/account/56695/mp16.jpg", "image/jpeg");
-		$inst->setRemove(False);
-		$this->assertStatus(
-			$inst,
-			name: 'mp16.jpg',
-			path: 'uploaded/account/56695/mp16.jpg',
-			contentType: 'image/jpeg',
-			remove: False,
-			filled: True
-		);
-	}
-
-
-
-	/**
-	 * Verifies the complete status of the object - all methods at once.
-	 */
-	private function assertStatus(
-		FileCurrent $inst,
-		string $name,
-		string $path,
-		string $contentType,
-		bool $remove,
-		bool $filled
-	): void
-	{
-		$this->assertSame($name, $inst->getName());
-		$this->assertSame($path, $inst->getPath());
-		$this->assertSame($path, $inst->getTemporaryFile());
-		$this->assertSame($path, $inst->getId());
-		$this->assertSame($contentType, $inst->getContentType());
-		$this->assertSame($remove, $inst->isRemove());
-		$this->assertSame($filled, $inst->isFilled());
-		$this->assertSame(1, $inst->getSize());
-		$this->assertSame(0, $inst->getError());
+		$inst = new FileCurrent("uploaded/account/56695/mp16.jpg", "image/jpeg", 42);
+		$this->assertSame(42, $inst->getSize());
 	}
 
 }

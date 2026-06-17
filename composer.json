@@ -11,7 +11,7 @@
 	],
 	"require": {
 		"php" : ">=8.1",
-		"nette/forms": "~3.1.0"
+		"nette/forms": "~3.1"
 	},
 	"require-dev": {
 		"phpstan/phpstan": "^1.10",
@@ -28,7 +28,7 @@
 		"classmap": ["libs"]
 	},
 	"scripts": {
-		"phpstan": "phpstan analyse",
+		"phpstan": "phpstan analyse --memory-limit=512M",
 		"phpunit": "vendor/bin/phpunit",
 		"phpcs": "vendor/bin/phpcs",
 		"phpcbf": "vendor/bin/phpcbf",

@@ -31,10 +31,7 @@ interface UploadStore
 
 
 
-	/**
-	 * @param string $filename Filename of uploaded file.
-	 */
-	function exists(string $filename): bool;
+	function getRealPathFrom(FileUploaded $file): ?string;
 
 
 
@@ -62,13 +59,6 @@ interface UploadStore
 interface FilePreviewer
 {
 
-	function getPreviewControlFor(FileUploaded | FileCurrent $val): Html;
-
-}
-
-
-
-interface FileValue
-{
+	function getPreviewControlFor(UploadStore $store, FileControl | MultiFileControl $control, FileUploaded | FileCurrent $val): Html;
 
 }

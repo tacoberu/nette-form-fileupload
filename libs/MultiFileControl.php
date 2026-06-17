@@ -53,8 +53,6 @@ class MultiFileControl extends BaseControl
 	 */
 	private readonly Html $currentControl;
 
-	private readonly Html $previewControl;
-
 	private readonly Html $labelControl;
 
 	private readonly Html $transactionControl;
@@ -118,10 +116,8 @@ class MultiFileControl extends BaseControl
 			'readonly' => 1,
 			'style' => 'display: none',
 		]);
-		$this->previewControl = Html::el('input', [
+		$this->labelControl = Html::el('input', [
 			'readonly' => 1,
-		]);
-		$this->labelControl = Html::el('span', [
 		]);
 		$this->transactionControl = Html::el('input', [
 			'type' => 'hidden',
@@ -200,11 +196,8 @@ class MultiFileControl extends BaseControl
 				if (!in_array($rawvalue, $used, True)) {
 					continue;
 				}
-				$value = Utils::createFileUploadedFromValue($rawvalue);
-				// If it's in the store, it's not committed. How else would he get here?
-				$values[] = $this->store->exists($value->getId())
-					? $value
-					: Utils::createFileCurrentFromValue($rawvalue);
+				$value = Utils::createFileValueFromRaw($rawvalue);
+				$values[] = $value;
 			}
 		}
 
@@ -264,6 +257,37 @@ class MultiFileControl extends BaseControl
 
 
 	/**
+	 * Returns container HTML element template.
+	 */
+	function getContainerPrototype(): Html
+	{
+		return $this->container;
+	}
+
+
+
+	function getItemControlPrototype(): Html
+	{
+		return $this->itemControl;
+	}
+
+
+
+	function getLabelControlPrototype(): Html
+	{
+		return $this->labelControl;
+	}
+
+
+
+	function getUploadControlPrototype(): Html|string
+	{
+		return parent::getControl();
+	}
+
+
+
+	/**
 	 * Have been all files successfully uploaded?
 	 */
 	function isOk(): bool
@@ -294,21 +318,39 @@ class MultiFileControl extends BaseControl
 
 
 	/**
-	 * Overrides addRule to handle Image/MimeType/MaxFileSize side-effects on the input element.
+	 * Overrides addRule to redirect Nette's file validators (which type-hint UploadControl)
+	 * to our own equivalents in Utils that accept any Control.
 	 */
 	function addRule(callable|string $validator, string|Stringable|null $errorMessage = null, mixed $arg = null): static
 	{
 		if ($validator === Form::Image) {
 			$this->control->accept = implode(', ', Forms\Helpers::getSupportedImages());
+			$this->getRules()->removeRule([Utils::class, 'validateImage']);
+			return parent::addRule(
+				[Utils::class, 'validateImage'],
+				$errorMessage ?? Forms\Validator::$messages[Form::Image],
+				$arg
+			);
 		}
 		elseif ($validator === Form::MimeType) {
 			$this->control->accept = implode(', ', (array) $arg);
+			$this->getRules()->removeRule([Utils::class, 'validateMimeType']);
+			return parent::addRule(
+				[Utils::class, 'validateMimeType'],
+				$errorMessage ?? Forms\Validator::$messages[Form::MimeType],
+				$arg
+			);
 		}
 		elseif ($validator === Form::MaxFileSize) {
 			if ($arg > ($ini = Forms\Helpers::iniGetSize('upload_max_filesize'))) {
 				trigger_error("Value of MaxFileSize ($arg) is greater than value of directive upload_max_filesize ($ini).", E_USER_WARNING);
 			}
-			$this->getRules()->removeRule($validator);
+			$this->getRules()->removeRule([Utils::class, 'validateFileSize']);
+			return parent::addRule(
+				[Utils::class, 'validateFileSize'],
+				$errorMessage ?? Forms\Validator::$messages[Form::MaxFileSize],
+				$arg
+			);
 		}
 		return parent::addRule($validator, $errorMessage, $arg);
 	}
@@ -325,23 +367,14 @@ class MultiFileControl extends BaseControl
 
 
 
-	private function getPreviewControlPart(FileUploaded | FileCurrent $src): Html
+	private function getLabelControlPart(FileUploaded | FileCurrent $src): Html
 	{
 		if (empty($this->previewer)) {
-			$el = clone $this->previewControl;
+			$el = clone $this->labelControl;
 			$el->value = $src->getName();
 			return $el;
 		}
-		return $this->previewer->getPreviewControlFor($src);
-	}
-
-
-
-	private function getLabelControlPart(FileUploaded | FileCurrent $src): Html
-	{
-		$el = clone $this->labelControl;
-		$el->setText($src->getName());
-		return $el;
+		return $this->previewer->getPreviewControlFor($this->store, $this, $src);
 	}
 
 
@@ -376,7 +409,6 @@ class MultiFileControl extends BaseControl
 		else {
 			$el->addHtml($this->getUseCheckboxPart($name, $value));
 			$el->addHtml($this->getCurrentPart($name, $value));
-			$el->addHtml($this->getPreviewControlPart($value));
 			$el->addHtml($this->getLabelControlPart($value));
 		}
 		return $el;

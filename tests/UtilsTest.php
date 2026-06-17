@@ -9,6 +9,7 @@ namespace Taco\Nette\Forms\Controls;
 
 use Nette\Forms\Form;
 use Nette\Http\FileUpload;
+use Nette\Utils\Json;
 use PHPUnit\Framework\TestCase;
 use LogicException;
 
@@ -18,56 +19,40 @@ class UtilsTest extends TestCase
 
 	function testSerializeFileCurrent()
 	{
-		$src = new FileCurrent("tasks/6s3qva8l/4728-05.jpg", "image/jpeg");
-		$this->assertSame('image/jpeg#tasks/6s3qva8l/4728-05.jpg', Utils::serializeFile($src));
+		$src = new FileCurrent("tasks/6s3qva8l/4728-05.jpg", "image/jpeg", 42);
+		$this->assertSame(
+			Json::encode(['c', 'image/jpeg', 42, 'tasks/6s3qva8l/4728-05.jpg', '4728-05.jpg']),
+			Utils::serializeFile($src)
+		);
 	}
 
 
 
 	function testSerializeFileUploaded()
 	{
-		$src = new FileUploaded("tasks/6s3qva8l/4728-05.jpg", "image/jpeg");
-		$this->assertSame('image/jpeg#tasks/6s3qva8l/4728-05.jpg', Utils::serializeFile($src));
+		$src = new FileUploaded("tasks/6s3qva8l/4728-05.jpg", "image/jpeg", 42);
+		$this->assertSame(
+			Json::encode(['u', 'image/jpeg', 42, 'tasks/6s3qva8l/4728-05.jpg', '4728-05.jpg']),
+			Utils::serializeFile($src)
+		);
 	}
 
 
 
-	function testCreateFileUploadedFromValue()
+	function testCreateFileValueFromRaw()
 	{
-		$inst = Utils::createFileUploadedFromValue('image/jpeg#tasks/6s3qva8l/4728-05.jpg');
-		$this->assertInstanceOf(FileUploaded::class, $inst);
-		$this->assertSame('tasks/6s3qva8l/4728-05.jpg', $inst->getId());
-		$this->assertSame('image/jpeg', $inst->getContentType());
-	}
+		$src = new FileCurrent("tasks/6s3qva8l/4728-05.jpg", "image/jpeg", 42);
+		$result = Utils::createFileValueFromRaw(Utils::serializeFile($src));
+		$this->assertInstanceOf(FileCurrent::class, $result);
+		$this->assertSame('tasks/6s3qva8l/4728-05.jpg', $result->getId());
+		$this->assertSame('image/jpeg', $result->getContentType());
+		$this->assertSame(42, $result->getSize());
 
-
-
-	function testCreateFileCurrentFromValue()
-	{
-		$inst = Utils::createFileCurrentFromValue('image/jpeg#tasks/6s3qva8l/4728-05.jpg');
-		$this->assertInstanceOf(FileCurrent::class, $inst);
-		$this->assertSame('tasks/6s3qva8l/4728-05.jpg', $inst->getId());
-		$this->assertSame('image/jpeg', $inst->getContentType());
-	}
-
-
-
-	function testSerializeAndCreateRoundtrip()
-	{
-		$value = 'image/jpeg#tasks/6s3qva8l/4728-05.jpg';
-		$this->assertSame($value, Utils::serializeFile(Utils::createFileUploadedFromValue($value)));
-		$this->assertSame($value, Utils::serializeFile(Utils::createFileCurrentFromValue($value)));
-	}
-
-
-
-	function testPathContainingHashIsPreserved()
-	{
-		// Only the first '#' separates the type, the path may contain more.
-		$inst = Utils::createFileUploadedFromValue('image/jpeg#tasks/a#b/4728.jpg');
-		$this->assertSame('tasks/a#b/4728.jpg', $inst->getId());
-		$this->assertSame('image/jpeg', $inst->getContentType());
-		$this->assertSame('image/jpeg#tasks/a#b/4728.jpg', Utils::serializeFile($inst));
+		$src2 = new FileUploaded("tasks/6s3qva8l/4728-05.jpg", "image/jpeg", 42);
+		$result2 = Utils::createFileValueFromRaw(Utils::serializeFile($src2));
+		$this->assertInstanceOf(FileUploaded::class, $result2);
+		$this->assertSame('tasks/6s3qva8l/4728-05.jpg', $result2->getId());
+		$this->assertSame('image/jpeg', $result2->getContentType());
 	}
 
 
@@ -125,8 +110,9 @@ class UtilsTest extends TestCase
 	function testFormatErrorKnownError()
 	{
 		$file = $this->upload(UPLOAD_ERR_INI_SIZE);
+		$limit = \Nette\Forms\Helpers::iniGetSize('upload_max_filesize');
 		$this->assertSame(
-			'foo.jpg: The uploaded file exceeds the upload_max_filesize directive in php.ini',
+			'foo.jpg: ' . sprintf(\Nette\Forms\Validator::$messages[Form::MaxFileSize], $limit),
 			Utils::formatError($file)
 		);
 	}
