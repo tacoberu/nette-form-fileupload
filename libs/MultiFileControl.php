@@ -7,12 +7,14 @@
 
 namespace Taco\Nette\Forms\Controls;
 
-use Nette;
 use Nette\Utils\Html;
 use Nette\Forms\Form;
 use Nette\Forms\Container;
+use Nette\Forms\Controls\BaseControl;
 use Nette\Forms\Controls\UploadControl as NetteUploadControl;
 use Nette\Forms\Controls\SubmitButton;
+use Nette\Forms;
+use Nette\InvalidStateException;
 use Stringable;
 use LogicException;
 
@@ -29,7 +31,7 @@ use LogicException;
  *
  * @author Martin Takáč <martin@takac.name>
  */
-class MultiFileControl extends NetteUploadControl
+class MultiFileControl extends BaseControl
 {
 
 	/**
@@ -68,6 +70,7 @@ class MultiFileControl extends NetteUploadControl
 	 */
 	static function register(string $name = 'FileControl', ?UploadStore $store = Null): void
 	{
+		// @phpstan-ignore argument.type (extensionMethod passes extra args to the callback at runtime)
 		Container::extensionMethod('addMulti' . $name, static function (
 			Container $container,
 			string $controlName,
@@ -85,6 +88,19 @@ class MultiFileControl extends NetteUploadControl
 	function __construct(string|Stringable|null $label = null, ?UploadStore $store = Null)
 	{
 		parent::__construct($label);
+
+		// File upload setup — replaces what UploadControl's constructor did.
+		$this->control->type = 'file';
+		$this->setOption('type', 'file');
+		$this->addCondition(true)
+			->addRule($this->isOk(...), Forms\Validator::$messages[NetteUploadControl::Valid]);
+		$this->addRule(Form::MaxFileSize, null, Forms\Helpers::iniGetSize('upload_max_filesize'));
+		$this->monitor(Form::class, static function (Form $form): void {
+			if ( ! $form->isMethod('post')) {
+				throw new InvalidStateException('File upload requires method POST.');
+			}
+			$form->getElementPrototype()->enctype = 'multipart/form-data';
+		});
 
 		$this->container = Html::el('div', [
 			'data-taco-type' => 'file multiple',
@@ -121,13 +137,6 @@ class MultiFileControl extends NetteUploadControl
 		$this->store = $store instanceof UploadStore
 			? $store
 			: new UploadStoreTemp();
-
-		$this->monitor(Form::class, static function (Form $form): void {
-			if ( ! $form->isMethod('post')) {
-				throw new Nette\InvalidStateException('File upload requires method POST.');
-			}
-			$form->getElementPrototype()->enctype = 'multipart/form-data';
-		});
 	}
 
 
@@ -164,9 +173,9 @@ class MultiFileControl extends NetteUploadControl
 
 	/**
 	 * Returning values.
-	 * @return array<FileUploaded | FileCurrent>
+	 * @return array<FileUploaded|FileCurrent>
 	 */
-	function getValue()
+	function getValue(): array
 	{
 		return (array) $this->value;
 	}
@@ -284,6 +293,28 @@ class MultiFileControl extends NetteUploadControl
 
 
 
+	/**
+	 * Overrides addRule to handle Image/MimeType/MaxFileSize side-effects on the input element.
+	 */
+	function addRule(callable|string $validator, string|Stringable|null $errorMessage = null, mixed $arg = null): static
+	{
+		if ($validator === Form::Image) {
+			$this->control->accept = implode(', ', Forms\Helpers::getSupportedImages());
+		}
+		elseif ($validator === Form::MimeType) {
+			$this->control->accept = implode(', ', (array) $arg);
+		}
+		elseif ($validator === Form::MaxFileSize) {
+			if ($arg > ($ini = Forms\Helpers::iniGetSize('upload_max_filesize'))) {
+				trigger_error("Value of MaxFileSize ($arg) is greater than value of directive upload_max_filesize ($ini).", E_USER_WARNING);
+			}
+			$this->getRules()->removeRule($validator);
+		}
+		return parent::addRule($validator, $errorMessage, $arg);
+	}
+
+
+
 	private function getCurrentPart(string $name, FileUploaded | FileCurrent $value): Html
 	{
 		$el = clone $this->currentControl;
@@ -335,7 +366,7 @@ class MultiFileControl extends NetteUploadControl
 
 
 
-	 private function getItemControlPart(string $name, null | FileUploaded | FileCurrent $value): Html
+	private function getItemControlPart(string $name, null | FileUploaded | FileCurrent $value): Html
 	{
 		$el = clone $this->itemControl;
 		if (empty($value)) {
