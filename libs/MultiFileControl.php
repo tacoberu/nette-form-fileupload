@@ -189,9 +189,11 @@ class MultiFileControl extends BaseControl
 
 		// Odškrtnutí znamená vyhodit.
 		$used = $this->getHttpData(Form::DataLine, '[use][]');
+		$used = array_unique($used);
 
 		$values = [];
 		if ($rawvalues = $this->getHttpData(Form::DataText, '[current][]')) {
+			$rawvalues = array_unique($rawvalues);
 			foreach ($rawvalues as $rawvalue) {
 				if (!in_array($rawvalue, $used, True)) {
 					continue;
