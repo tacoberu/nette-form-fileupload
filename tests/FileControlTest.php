@@ -31,7 +31,7 @@ class FileControlTest extends TestCase
 
 		$this->submit($control, [
 			'transaction' => '123',
-			'current' => 'image/jpeg#uploaded/account/56695/mp16.jpg',
+			'current' => Utils::serializeFile(new FileCurrent('uploaded/account/56695/mp16.jpg', 'image/jpeg', 0)),
 			'remove' => 'X',
 		]);
 

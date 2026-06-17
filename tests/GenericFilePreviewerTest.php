@@ -18,9 +18,14 @@ class GenericFilePreviewerTest extends TestCase
 
 	function testPreviewForNonImageFile()
 	{
-		// A non-image file does not exist on the disk - a generic icon is generated.
-		$previewer = new GenericFilePreviewer();
-		$html = $previewer->getPreviewControlFor(new FileCurrent('uploaded/report.pdf', 'application/pdf'));
+		$previewer = new GenericFilePreviewer(__DIR__ . '/../examples');
+		$store = $this->createMock(UploadStore::class);
+		$control = $this->createMock(FileControl::class);
+		$html = $previewer->getPreviewControlFor(
+			$store,
+			$control,
+			new FileCurrent('uploaded/report.pdf', 'application/pdf', 0)
+		);
 
 		$this->assertPreview($html, alt: 'report.pdf');
 	}
@@ -29,8 +34,15 @@ class GenericFilePreviewerTest extends TestCase
 
 	function testPreviewForImageFile()
 	{
-		$previewer = new GenericFilePreviewer();
-		$html = $previewer->getPreviewControlFor(new FileCurrent(self::ImageFile, 'image/jpeg'));
+		$basePath = __DIR__ . '/../examples/document_root/img';
+		$previewer = new GenericFilePreviewer($basePath);
+		$store = $this->createMock(UploadStore::class);
+		$control = $this->createMock(FileControl::class);
+		$html = $previewer->getPreviewControlFor(
+			$store,
+			$control,
+			new FileCurrent('the-cat.jpeg', 'image/jpeg', 0)
+		);
 
 		$this->assertPreview($html, alt: 'the-cat.jpeg');
 	}
@@ -39,9 +51,15 @@ class GenericFilePreviewerTest extends TestCase
 
 	function testPreviewForFileUploaded()
 	{
-		// The previewer accepts FileUploaded as well.
-		$previewer = new GenericFilePreviewer();
-		$html = $previewer->getPreviewControlFor(new FileUploaded(self::ImageFile, 'image/jpeg', 'kitten.jpeg'));
+		$previewer = new GenericFilePreviewer(__DIR__ . '/../examples');
+		$store = $this->createMock(UploadStore::class);
+		$store->method('getRealPathFrom')->willReturn(self::ImageFile);
+		$control = $this->createMock(FileControl::class);
+		$html = $previewer->getPreviewControlFor(
+			$store,
+			$control,
+			new FileUploaded('the-cat.jpeg', 'image/jpeg', 0, 'kitten.jpeg')
+		);
 
 		$this->assertPreview($html, alt: 'kitten.jpeg');
 	}
@@ -50,10 +68,14 @@ class GenericFilePreviewerTest extends TestCase
 
 	function testPreviewForMissingImageFallsBackToGenericIcon()
 	{
-		// An image extension, but the file does not exist - must not throw,
-		// it falls back to the generic icon instead.
-		$previewer = new GenericFilePreviewer();
-		$html = $previewer->getPreviewControlFor(new FileCurrent('uploaded/account/56695/missing.jpg', 'image/jpeg'));
+		$previewer = new GenericFilePreviewer(__DIR__ . '/../examples');
+		$store = $this->createMock(UploadStore::class);
+		$control = $this->createMock(FileControl::class);
+		$html = $previewer->getPreviewControlFor(
+			$store,
+			$control,
+			new FileCurrent('uploaded/account/56695/missing.jpg', 'image/jpeg', 0)
+		);
 
 		$this->assertPreview($html, alt: 'missing.jpg');
 	}

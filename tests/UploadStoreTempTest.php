@@ -67,15 +67,6 @@ class UploadStoreTempTest extends TestCase
 
 
 
-	function testExists()
-	{
-		$store = $this->createStore();
-		$this->assertTrue($store->exists(__FILE__));
-		$this->assertFalse($store->exists($this->baseDir . '/does-not-exist'));
-	}
-
-
-
 	function testAppendMovesFileIntoTransactionDir()
 	{
 		$store = $this->createStore(123);
@@ -91,7 +82,7 @@ class UploadStoreTempTest extends TestCase
 		$this->assertFileExists($dest);
 		$this->assertFileDoesNotExist($src); // the source was moved away
 		$this->assertSame('hello world', file_get_contents($dest));
-		$this->assertSame($dest, $result->getId());
+		$this->assertSame($file->getSanitizedName(), $result->getId());
 		$this->assertSame('mp16.jpg', $result->getName()); // original (unsanitized) name
 	}
 

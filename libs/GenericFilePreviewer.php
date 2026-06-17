@@ -46,11 +46,29 @@ class GenericFilePreviewer implements FilePreviewer
 	 */
 	private int $format = ImageType::JPEG;
 
-	function getPreviewControlFor(FileUploaded | FileCurrent $val): Html
+	function __construct(private readonly string $basePath)
 	{
-		$content = self::isImageTypeByFilename($val->getId())
-			? $this->renderContentFor($val)
-			: $this->renderDefaultImageContent($val);
+	}
+
+
+
+	function getPreviewControlFor(UploadStore $store, FileControl | MultiFileControl $control, FileUploaded | FileCurrent $val): Html
+	{
+		if ($val instanceof FileUploaded) {
+			$content = ($path = $store->getRealPathFrom($val)) && self::isImageTypeByFilename($path)
+				? $this->renderContentFor($path)
+				: $this->renderDefaultImageContent($path);
+		}
+		else if ($val instanceof FileCurrent) {
+			$path = implode(DIRECTORY_SEPARATOR, [
+				$this->basePath,
+				$val->getId(),
+			]);
+			$content = file_exists($path)
+				? $this->renderContentFor($path)
+				: $this->renderDefaultImageContent($path);
+		}
+
 		return Html::el('img')
 			->setAttribute('src', 'data:' . Image::typeToMimeType($this->format) . ';base64, ' . base64_encode($content))
 			->setAttribute('alt', $val->getName());
@@ -62,25 +80,25 @@ class GenericFilePreviewer implements FilePreviewer
 	 * Renders a thumbnail of the image, or a generic icon when the file
 	 * is not a loadable image (wrong type, missing or unreadable file).
 	 */
-	private function renderContentFor(FileUploaded | FileCurrent $src): string
+	private function renderContentFor(string $path): string
 	{
 		try {
-			$image = Image::fromFile($src->getId());
+			$image = Image::fromFile($path);
 			$image->resize($this->width, $this->height, $this->flag);
 			return $image->toString($this->format, $this->quality);
 		}
 		catch (ImageException) {
-			return $this->renderDefaultImageContent($src);
+			return $this->renderDefaultImageContent($path);
 		}
 	}
 
 
 
-	private function renderDefaultImageContent(FileUploaded | FileCurrent $src): string
+	private function renderDefaultImageContent(string $path): string
 	{
 		$image = Image::fromBlank($this->width, $this->height, Image::rgb(190, 190, 190));
 		// @phpstan-ignore-next-line
-		$image->string(8, 8, 8, self::getFileExtension($src->getId()), $image->colorAllocate(0, 0, 0));
+		$image->string(8, 8, 8, self::getFileExtension($path), $image->colorAllocate(0, 0, 0));
 		return $image->toString($this->format, $this->quality);
 	}
 

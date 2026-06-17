@@ -140,17 +140,23 @@ class UploadStoreTemp implements UploadStore
 
 
 
-	function exists($filename): bool
+	function getRealPathFrom(FileUploaded $file): ?string
 	{
-		return file_exists($filename);
+		$path = $this->getTransactionDir();
+		$path[] = $file->getId();
+		$path = implode(DIRECTORY_SEPARATOR, $path);
+		return file_exists($path)
+			? $path
+			: Null;
 	}
 
 
 
 	function append(FileUpload $file): FileUploaded
 	{
+		$name = $file->getSanitizedName();
 		$path = $this->getTransactionDir();
-		$path[] = $file->sanitizedName;
+		$path[] = $name;
 		$path = implode(DIRECTORY_SEPARATOR, $path);
 
 		// Vytvořit, pokud neexistuje.
@@ -160,7 +166,7 @@ class UploadStoreTemp implements UploadStore
 		}
 
 		$file->move($path);
-		return new FileUploaded($file->temporaryFile, $file->contentType, $file->name);
+		return new FileUploaded($name, $file->contentType, $file->getSize(), $file->getUntrustedName());
 	}
 
 

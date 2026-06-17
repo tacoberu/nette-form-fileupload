@@ -55,7 +55,7 @@ class FileControl extends BaseControl
 	 */
 	private readonly Html $currentControl;
 
-	private readonly Html $previewControl;
+	private readonly Html $labelControl;
 
 	private readonly Html $transactionControl;
 
@@ -105,20 +105,22 @@ class FileControl extends BaseControl
 			? $store
 			: new UploadStoreTemp();
 		$this->container = Html::el('div', [
-			'class' => $this->formatClass(Null),
+			'class' => $this->formatClass(Null) . ' ' . $this->formatClass('single'),
 		]);
 		$this->removeButton = Html::el('input', [
 			'type' => 'submit',
 			'value' => $this->translate(self::RemoveButtonLabel),
 			'title' => $this->translate('Remove'),
 			'formnovalidate' => '',
+			'class' => $this->formatClass('remove'),
 		]);
 		$this->currentControl = Html::el('input', [
 			'readonly' => 1,
 			'style' => 'display: none',
 		]);
-		$this->previewControl = Html::el('input', [
+		$this->labelControl = Html::el('input', [
 			'readonly' => 1,
+			'class' => $this->formatClass('label'),
 		]);
 		$this->transactionControl = Html::el('input', [
 			'type' => 'hidden',
@@ -157,11 +159,7 @@ class FileControl extends BaseControl
 			}
 		}
 		elseif ($rawvalue = $this->getHttpData(Form::DataText, '[current]')) {
-			$value = Utils::createFileUploadedFromValue($rawvalue);
-			// If it's in the store, it's not committed. How else would he get here?
-			$this->value = $this->store->exists($value->getId())
-				? $value
-				: Utils::createFileCurrentFromValue($rawvalue);
+			$this->value = Utils::createFileValueFromRaw($rawvalue);
 		}
 		else {
 			$this->value = null;
@@ -200,10 +198,7 @@ class FileControl extends BaseControl
 	 */
 	function isFilled(): bool
 	{
-		if (empty($this->value)) {
-			return False;
-		}
-		return $this->value->isFilled();
+		return !empty($this->value);
 	}
 
 
@@ -282,21 +277,39 @@ class FileControl extends BaseControl
 
 
 	/**
-	 * Overrides addRule to handle Image/MimeType/MaxFileSize side-effects on the input element.
+	 * Overrides addRule to redirect Nette's file validators (which type-hint UploadControl)
+	 * to our own equivalents in Utils that accept any Control.
 	 */
 	function addRule(callable|string $validator, string|Stringable|null $errorMessage = null, mixed $arg = null): static
 	{
 		if ($validator === Form::Image) {
 			$this->control->accept = implode(', ', Forms\Helpers::getSupportedImages());
+			$this->getRules()->removeRule([Utils::class, 'validateImage']);
+			return parent::addRule(
+				[Utils::class, 'validateImage'],
+				$errorMessage ?? Forms\Validator::$messages[Form::Image],
+				$arg
+			);
 		}
 		elseif ($validator === Form::MimeType) {
 			$this->control->accept = implode(', ', (array) $arg);
+			$this->getRules()->removeRule([Utils::class, 'validateMimeType']);
+			return parent::addRule(
+				[Utils::class, 'validateMimeType'],
+				$errorMessage ?? Forms\Validator::$messages[Form::MimeType],
+				$arg
+			);
 		}
 		elseif ($validator === Form::MaxFileSize) {
 			if ($arg > ($ini = Forms\Helpers::iniGetSize('upload_max_filesize'))) {
 				trigger_error("Value of MaxFileSize ($arg) is greater than value of directive upload_max_filesize ($ini).", E_USER_WARNING);
 			}
-			$this->getRules()->removeRule($validator);
+			$this->getRules()->removeRule([Utils::class, 'validateFileSize']);
+			return parent::addRule(
+				[Utils::class, 'validateFileSize'],
+				$errorMessage ?? Forms\Validator::$messages[Form::MaxFileSize],
+				$arg
+			);
 		}
 		return parent::addRule($validator, $errorMessage, $arg);
 	}
@@ -332,16 +345,6 @@ class FileControl extends BaseControl
 
 
 
-	/**
-	 * Returns current file HTML element template.
-	 */
-	function getCurrentControlPrototype(): Html
-	{
-		return $this->currentControl;
-	}
-
-
-
 	function getCurrentPart(string $name, FileUploaded | FileCurrent $value): Html
 	{
 		$el = clone $this->currentControl;
@@ -352,9 +355,16 @@ class FileControl extends BaseControl
 
 
 
-	function getPreviewControlPrototype(): Html
+	function getLabelControlPrototype(): Html
 	{
-		return $this->previewControl;
+		return $this->labelControl;
+	}
+
+
+
+	function getUploadControlPrototype(): Html|string
+	{
+		return parent::getControl();
 	}
 
 
@@ -362,11 +372,11 @@ class FileControl extends BaseControl
 	function getPreviewControlPart(FileUploaded | FileCurrent $src): Html
 	{
 		if (empty($this->previewer)) {
-			$el = clone $this->previewControl;
+			$el = clone $this->labelControl;
 			$el->value = $src->getName();
 			return $el;
 		}
-		return $this->previewer->getPreviewControlFor($src);
+		return $this->previewer->getPreviewControlFor($this->store, $this, $src);
 	}
 
 
@@ -379,6 +389,7 @@ class FileControl extends BaseControl
 		}
 		$el = clone $el;
 		$el->name = $name . '[new]';
+		$el->appendAttribute('class', $this->formatClass('upload'));
 		// Existenci validujeme podle $name[current], ale nový záznam podle $name[new].
 		if ($withoutRequired) {
 			unset($el->required);
