@@ -80,3 +80,7 @@ div.taco-filecontrol-upload > input.taco-filecontrol-preload {
 div.taco-filecontrol-row:has(input[type="checkbox"]:not(:checked)) {
 	display: none;
 }
+
+div.taco-filecontrol.taco-filecontrol-single > .taco-filecontrol-remove {
+	float: right;
+}
