@@ -22,6 +22,11 @@
 	<script src="{$basePath}/js/netteForms.min.js"></script>
 	<script src="{$basePath}/js/netteAjax.js"></script>
 	{* <script src="{$basePath}/js/jquery.filePreuploader.js"></script> *}
+	<script type="module">
+		import { initMultiFileAutoPreload } from '{$basePath|noescape}/js/filecontrol.js';
+		document.querySelectorAll('[data-taco-type="file multiple"]')
+			.forEach(initMultiFileAutoPreload);
+	</script>
 	<script type="text/javascript">
 		$(function() {
 			$(function () {
