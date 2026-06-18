@@ -117,17 +117,17 @@ class DashboardPresenter extends BasePresenter
 			->setValue('Smazat')
 			->setTitle('Smazat');
 		$form->addFileControl('portrait6', 'Portrait 6')
-			->setOption("description", "Povinná položka")
+			->setOption("description", "Required field")
 			->setRequired()
-			->addRule($form::MaxFileSize, "Maximální velikost souboru %d bytů.", 255);
+			->addRule($form::MaxFileSize, "File size must not exceed %d bytes.", 255);
 
-		$form->addCheckbox("aux", "Příloha?");
+		$form->addCheckbox("aux", "Attachment?");
 
 		$form->addFileControl('portrait7', 'Portrait 7')
-			->setOption("description", "Povinná položka, je-li zaškrtnuta příloha.");
+			->setOption("description", "Required when attachment is checked.");
 		$form['portrait7']
 			->addConditionOn($form['aux'], $form::Equal, true)
-				->setRequired("Vyžadován %name");
+				->setRequired("Required: %name");
 
 		$form->setCurrentGroup(NULL);
 		$form->addSubmit('submit', 'Save')
@@ -195,7 +195,7 @@ class DashboardPresenter extends BasePresenter
 		$form->onSuccess[] = $this->createProcessSubmitted();
 		$form->onAnchor[] = static function($form) {
 			if ( ! $form->isSubmitted()) {
-				// Nějaká inicializace původních dat
+				// Initialize default values here if needed
 			}
 		};
 
