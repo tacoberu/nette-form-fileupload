@@ -13,6 +13,8 @@ use Nette\Forms\Controls\UploadControl as NetteUploadControl;
 use Nette\Forms\Container;
 use Nette\Forms;
 use Nette\Utils\Html;
+use Nette\Application\UI\Presenter;
+use Nette\Application\UI\SignalReceiver;
 use Nette\InvalidStateException;
 use Stringable;
 use LogicException;
@@ -30,18 +32,12 @@ use LogicException;
  *
  * @author Martin Takáč <martin@takac.name>
  */
-class FileControl extends BaseControl
+class FileControl extends BaseControl implements SignalReceiver
 {
 
+	use FileControlUnit;
+
 	public const RemoveButtonLabel = "✕"; // &#x2715;
-
-	/**
-	 * A repository holding uploaded files before they are actually saved.
-	 * By default it's just a temp directory, see UploadStoreTemp
-	 */
-	private readonly UploadStore $store;
-
-	private ?FilePreviewer $previewer = Null;
 
 	private readonly Html $container;
 
@@ -59,8 +55,6 @@ class FileControl extends BaseControl
 
 	private readonly Html $transactionControl;
 
-	private string $prefix = "taco-filecontrol";
-
 	/**
 	 * Registers a form extension method `add{$name}` (default `addFileControl`),
 	 * which creates a FileControl with the store injected from the DI container.
@@ -68,7 +62,6 @@ class FileControl extends BaseControl
 	 */
 	static function register(string $name = 'FileControl', ?UploadStore $store = Null): void
 	{
-		// @phpstan-ignore argument.type (extensionMethod passes extra args to the callback at runtime)
 		Container::extensionMethod('add' . $name, static function (
 			Container $container,
 			string $controlName,
@@ -92,7 +85,6 @@ class FileControl extends BaseControl
 		$this->setOption('type', 'file');
 		$this->addCondition(true)
 			->addRule($this->isOk(...), Forms\Validator::$messages[NetteUploadControl::Valid]);
-		$this->addRule(Form::MaxFileSize, null, Forms\Helpers::iniGetSize('upload_max_filesize'));
 		$this->monitor(Form::class, static function (Form $form): void {
 			if (!$form->isMethod('post')) {
 				throw new InvalidStateException('File upload requires method POST.');
@@ -126,17 +118,6 @@ class FileControl extends BaseControl
 		$this->transactionControl = Html::el('input', [
 			'type' => 'hidden',
 		]);
-	}
-
-
-
-	/**
-	 * By setting the previewer, uploaded files will be represented by their respective previews.
-	 */
-	function setPreviewer(FilePreviewer $var): self
-	{
-		$this->previewer = $var;
-		return $this;
 	}
 
 
@@ -184,36 +165,6 @@ class FileControl extends BaseControl
 
 
 
-	/**
-	 * Have been all files successfully uploaded?
-	 */
-	function isOk(): bool
-	{
-		return True;
-	}
-
-
-
-	/**
-	 * Has been any file uploaded?
-	 */
-	function isFilled(): bool
-	{
-		return !empty($this->value);
-	}
-
-
-
-	/**
-	 * Explicitní vymazání transakce.
-	 */
-	function destroyStore(): void
-	{
-		$this->store->destroy();
-	}
-
-
-
 	function getValue(): FileUploaded|FileCurrent|null
 	{
 		return $this->value;
@@ -245,74 +196,30 @@ class FileControl extends BaseControl
 	 */
 	function getControl()
 	{
-		switch (True) {
-			// Existující soubor
-			case $this->value instanceof FileCurrent:
-			// Some file in the transaction.
-			// The second round of the form
-			case $this->value instanceof FileUploaded:
-				$name = $this->getHtmlName();
-				$container = clone $this->container;
-				return $container
-					->addHtml($this->getCurrentPart($name, $this->value))
-					->addHtml($this->getPreviewControlPart($this->value))
-					->addHtml($this->getRemoveButtonPart($name))
-					->addHtml($this->getNewControlPart($name, True))
-					->addHtml($this->getTransactionControlPart($name));
-
-			// No file selected
-			// No default file
-			// The first round of the form
-			case empty($this->value):
-				$name = $this->getHtmlName();
-				$container = clone $this->container;
-				return $container
-					->addHtml($this->getNewControlPart($name, False))
-					->addHtml($this->getTransactionControlPart($name));
-
-			default:
-				throw new LogicException("oops");
+		$name = $this->getHtmlName();
+		$container = clone $this->container;
+		if ($this->lookup(Presenter::class, throw: false) !== null) {
+			$container->setAttribute('data-upload-url', $this->link(':upload!'));
+			$chunkSize = Forms\Helpers::iniGetSize('upload_max_filesize') - 100 * 1024;
+			$container->setAttribute('data-chunk-size', (string) max(1, $chunkSize));
 		}
-	}
 
+		if ($this->value instanceof FileCurrent || $this->value instanceof FileUploaded) {
+			return $container
+				->addHtml($this->getCurrentPart($name, $this->value))
+				->addHtml($this->getPreviewControlPart($this->value))
+				->addHtml($this->getRemoveButtonPart($name))
+				->addHtml($this->getNewControlPart($name, True))
+				->addHtml($this->getTransactionControlPart($name));
+		}
 
+		if (empty($this->value)) {
+			return $container
+				->addHtml($this->getNewControlPart($name, False))
+				->addHtml($this->getTransactionControlPart($name));
+		}
 
-	/**
-	 * Overrides addRule to redirect Nette's file validators (which type-hint UploadControl)
-	 * to our own equivalents in Utils that accept any Control.
-	 */
-	function addRule(callable|string $validator, string|Stringable|null $errorMessage = null, mixed $arg = null): static
-	{
-		if ($validator === Form::Image) {
-			$this->control->accept = implode(', ', Forms\Helpers::getSupportedImages());
-			$this->getRules()->removeRule([Utils::class, 'validateImage']);
-			return parent::addRule(
-				[Utils::class, 'validateImage'],
-				$errorMessage ?? Forms\Validator::$messages[Form::Image],
-				$arg
-			);
-		}
-		elseif ($validator === Form::MimeType) {
-			$this->control->accept = implode(', ', (array) $arg);
-			$this->getRules()->removeRule([Utils::class, 'validateMimeType']);
-			return parent::addRule(
-				[Utils::class, 'validateMimeType'],
-				$errorMessage ?? Forms\Validator::$messages[Form::MimeType],
-				$arg
-			);
-		}
-		elseif ($validator === Form::MaxFileSize) {
-			if ($arg > ($ini = Forms\Helpers::iniGetSize('upload_max_filesize'))) {
-				trigger_error("Value of MaxFileSize ($arg) is greater than value of directive upload_max_filesize ($ini).", E_USER_WARNING);
-			}
-			$this->getRules()->removeRule([Utils::class, 'validateFileSize']);
-			return parent::addRule(
-				[Utils::class, 'validateFileSize'],
-				$errorMessage ?? Forms\Validator::$messages[Form::MaxFileSize],
-				$arg
-			);
-		}
-		return parent::addRule($validator, $errorMessage, $arg);
+		throw new LogicException("oops");
 	}
 
 
@@ -391,7 +298,7 @@ class FileControl extends BaseControl
 		$el = clone $el;
 		$el->name = $name . '[new]';
 		$el->appendAttribute('class', $this->formatClass('upload'));
-		// Existenci validujeme podle $name[current], ale nový záznam podle $name[new].
+		// Presence is validated via $name[current]; new uploads via $name[new].
 		if ($withoutRequired) {
 			unset($el->required);
 			$el->setAttribute('data-nette-rules', Utils::removeFilledRules($el->getAttribute('data-nette-rules') ?? []));
@@ -407,15 +314,6 @@ class FileControl extends BaseControl
 		$el->name = $name . '[transaction]';
 		$el->value = (string) $this->store->getId();
 		return $el;
-	}
-
-
-
-	private function formatClass(?string $suffix): string
-	{
-		return $suffix
-			? "{$this->prefix}-{$suffix}"
-			: $this->prefix;
 	}
 
 }

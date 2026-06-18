@@ -97,7 +97,6 @@ class GenericFilePreviewer implements FilePreviewer
 	private function renderDefaultImageContent(string $path): string
 	{
 		$image = Image::fromBlank($this->width, $this->height, Image::rgb(190, 190, 190));
-		// @phpstan-ignore-next-line
 		$image->string(8, 8, 8, self::getFileExtension($path), $image->colorAllocate(0, 0, 0));
 		return $image->toString($this->format, $this->quality);
 	}

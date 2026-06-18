@@ -14,6 +14,8 @@ use Nette\Forms\Controls\BaseControl;
 use Nette\Forms\Controls\UploadControl as NetteUploadControl;
 use Nette\Forms\Controls\SubmitButton;
 use Nette\Forms;
+use Nette\Application\UI\Presenter;
+use Nette\Application\UI\SignalReceiver;
 use Nette\InvalidStateException;
 use Stringable;
 use LogicException;
@@ -31,16 +33,10 @@ use LogicException;
  *
  * @author Martin Takáč <martin@takac.name>
  */
-class MultiFileControl extends BaseControl
+class MultiFileControl extends BaseControl implements SignalReceiver
 {
 
-	/**
-	 * A repository holding uploaded files before they are actually saved.
-	 * By default it's just a temp directory, see UploadStoreTemp
-	 */
-	private readonly UploadStore $store;
-
-	private ?FilePreviewer $previewer = Null;
+	use FileControlUnit;
 
 	private readonly Html $container;
 
@@ -59,8 +55,6 @@ class MultiFileControl extends BaseControl
 
 	private readonly Html $preloadButton;
 
-	private string $prefix = "taco-filecontrol";
-
 	/**
 	 * Registers a form extension method `addMulti{$name}` (default `addMultiFileControl`),
 	 * which creates a MultiFileControl with the store injected from the DI container.
@@ -68,7 +62,6 @@ class MultiFileControl extends BaseControl
 	 */
 	static function register(string $name = 'FileControl', ?UploadStore $store = Null): void
 	{
-		// @phpstan-ignore argument.type (extensionMethod passes extra args to the callback at runtime)
 		Container::extensionMethod('addMulti' . $name, static function (
 			Container $container,
 			string $controlName,
@@ -92,7 +85,6 @@ class MultiFileControl extends BaseControl
 		$this->setOption('type', 'file');
 		$this->addCondition(true)
 			->addRule($this->isOk(...), Forms\Validator::$messages[NetteUploadControl::Valid]);
-		$this->addRule(Form::MaxFileSize, null, Forms\Helpers::iniGetSize('upload_max_filesize'));
 		$this->monitor(Form::class, static function (Form $form): void {
 			if ( ! $form->isMethod('post')) {
 				throw new InvalidStateException('File upload requires method POST.');
@@ -139,17 +131,6 @@ class MultiFileControl extends BaseControl
 
 
 	/**
-	 * By setting the previewer, uploaded files will be represented by their respective previews.
-	 */
-	function setPreviewer(FilePreviewer $var): self
-	{
-		$this->previewer = $var;
-		return $this;
-	}
-
-
-
-	/**
 	 * Set control's values.
 	 *
 	 * @param array<mixed> $values
@@ -188,7 +169,7 @@ class MultiFileControl extends BaseControl
 		$id = $this->getHttpData(Form::DataLine, '[transaction]');
 		$this->store->setId($id ? (int) $id : Null);
 
-		// Odškrtnutí znamená vyhodit.
+		// Unchecked items are discarded.
 		$used = $this->getHttpData(Form::DataLine, '[use][]');
 		$used = array_unique($used);
 
@@ -204,7 +185,7 @@ class MultiFileControl extends BaseControl
 			}
 		}
 
-		// Ty, co přišli v pořádku, tak uložit do transakce, co nejsou v pořádku zahodit a oznámit neuspěch.
+		// Move successfully uploaded files into the transaction; report errors for the rest.
 		if ($files = $this->getHttpData(Form::DataFile, '[new][]')) {
 			foreach ($files as $file) {
 				if ($file->isOk()) {
@@ -246,6 +227,11 @@ class MultiFileControl extends BaseControl
 	{
 		$name = $this->getHtmlName();
 		$container = clone $this->container;
+		if ($this->lookup(Presenter::class, throw: false) !== null) {
+			$container->setAttribute('data-upload-url', $this->link(':upload!'));
+			$chunkSize = Forms\Helpers::iniGetSize('upload_max_filesize') - 100 * 1024;
+			$container->setAttribute('data-chunk-size', (string) max(1, $chunkSize));
+		}
 		foreach ($this->value as $item) {
 			$container->addHtml($this->getItemControlPart($name, $item));
 		}
@@ -286,76 +272,6 @@ class MultiFileControl extends BaseControl
 	function getUploadControlPrototype(): Html|string
 	{
 		return parent::getControl();
-	}
-
-
-
-	/**
-	 * Have been all files successfully uploaded?
-	 */
-	function isOk(): bool
-	{
-		return True;
-	}
-
-
-
-	/**
-	 * Has been any file uploaded?
-	 */
-	function isFilled(): bool
-	{
-		return !empty($this->value);
-	}
-
-
-
-	/**
-	 * Odstranění adresáře s transakcí.
-	 */
-	function destroyStore(): void
-	{
-		$this->store->destroy();
-	}
-
-
-
-	/**
-	 * Overrides addRule to redirect Nette's file validators (which type-hint UploadControl)
-	 * to our own equivalents in Utils that accept any Control.
-	 */
-	function addRule(callable|string $validator, string|Stringable|null $errorMessage = null, mixed $arg = null): static
-	{
-		if ($validator === Form::Image) {
-			$this->control->accept = implode(', ', Forms\Helpers::getSupportedImages());
-			$this->getRules()->removeRule([Utils::class, 'validateImage']);
-			return parent::addRule(
-				[Utils::class, 'validateImage'],
-				$errorMessage ?? Forms\Validator::$messages[Form::Image],
-				$arg
-			);
-		}
-		elseif ($validator === Form::MimeType) {
-			$this->control->accept = implode(', ', (array) $arg);
-			$this->getRules()->removeRule([Utils::class, 'validateMimeType']);
-			return parent::addRule(
-				[Utils::class, 'validateMimeType'],
-				$errorMessage ?? Forms\Validator::$messages[Form::MimeType],
-				$arg
-			);
-		}
-		elseif ($validator === Form::MaxFileSize) {
-			if ($arg > ($ini = Forms\Helpers::iniGetSize('upload_max_filesize'))) {
-				trigger_error("Value of MaxFileSize ($arg) is greater than value of directive upload_max_filesize ($ini).", E_USER_WARNING);
-			}
-			$this->getRules()->removeRule([Utils::class, 'validateFileSize']);
-			return parent::addRule(
-				[Utils::class, 'validateFileSize'],
-				$errorMessage ?? Forms\Validator::$messages[Form::MaxFileSize],
-				$arg
-			);
-		}
-		return parent::addRule($validator, $errorMessage, $arg);
 	}
 
 
@@ -428,7 +344,7 @@ class MultiFileControl extends BaseControl
 		$el = clone $el;
 		$el->name = $name . '[new][]';
 		$el->multiple = True;
-		// Existenci validujeme podle $name[current], ale nový záznam podle $name[new].
+		// Presence is validated via $name[current]; new uploads via $name[new].
 		if ($withoutRequired) {
 			unset($el->required);
 			$el->setAttribute('data-nette-rules', Utils::removeFilledRules($el->getAttribute('data-nette-rules') ?? []));
@@ -444,15 +360,6 @@ class MultiFileControl extends BaseControl
 		$el->name = $name . '[transaction]';
 		$el->value = (string) $this->store->getId();
 		return $el;
-	}
-
-
-
-	private function formatClass(?string $suffix): string
-	{
-		return $suffix
-			? "{$this->prefix}-{$suffix}"
-			: $this->prefix;
 	}
 
 

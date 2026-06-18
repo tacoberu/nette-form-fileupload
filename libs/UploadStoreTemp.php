@@ -12,6 +12,7 @@ use Nette\Utils\Strings;
 use Nette\Http\FileUpload;
 use FilesystemIterator;
 use RuntimeException;
+use InvalidArgumentException;
 
 
 /**
@@ -64,7 +65,7 @@ class UploadStoreTemp implements UploadStore
 	/**
 	 * @param string $prefix A string to prefix the directory for storing files.
 	 * @param int $id The identifier of an existing transaction. If not specified, a unique one is generated.
-	 * @param string $baseDir Umístění úložiště. Null = sys_get_temp_dir()
+	 * @param string $baseDir Storage root directory. Null = sys_get_temp_dir()
 	 * @param int $gcAgeLimit How old must a transaction be to be deleted.
 	 * @param int $gcMaxCount Maximum number of transactions to delete. In order to spread the load over time.
 	 */
@@ -159,7 +160,7 @@ class UploadStoreTemp implements UploadStore
 		$path[] = $name;
 		$path = implode(DIRECTORY_SEPARATOR, $path);
 
-		// Vytvořit, pokud neexistuje.
+		// Create directory if it does not exist yet.
 		$dir = dirname($path);
 		if ( ! file_exists($dir)) {
 			mkdir($dir, 0777, True);
@@ -167,6 +168,51 @@ class UploadStoreTemp implements UploadStore
 
 		$file->move($path);
 		return new FileUploaded($name, $file->contentType, $file->getSize(), $file->getUntrustedName());
+	}
+
+
+
+	function appendChunk(FileUpload $chunk, string $chunkId, int $chunkIndex, int $chunkTotal): ?FileUploaded
+	{
+		$chunkId = preg_replace('/[^a-zA-Z0-9_-]/', '', $chunkId);
+		if ($chunkId === '') {
+			throw new InvalidArgumentException('Invalid chunk ID.');
+		}
+
+		$transactionDir = implode(DIRECTORY_SEPARATOR, $this->getTransactionDir());
+		$chunksDir = $transactionDir . DIRECTORY_SEPARATOR . 'chunks-' . $chunkId;
+		if (!is_dir($chunksDir)) {
+			mkdir($chunksDir, 0777, True);
+		}
+
+		$chunk->move($chunksDir . DIRECTORY_SEPARATOR . $chunkIndex);
+
+		if ($chunkIndex < $chunkTotal - 1) {
+			return Null;
+		}
+
+		// Last chunk — assemble all parts into the transaction directory.
+		$name = $chunk->getSanitizedName();
+		$finalPath = $transactionDir . DIRECTORY_SEPARATOR . $name;
+
+		$out = fopen($finalPath, 'wb');
+		assert($out !== False);
+		for ($i = 0; $i < $chunkTotal; $i++) {
+			$part = fopen($chunksDir . DIRECTORY_SEPARATOR . $i, 'rb');
+			assert($part !== False);
+			stream_copy_to_stream($part, $out);
+			fclose($part);
+			unlink($chunksDir . DIRECTORY_SEPARATOR . $i);
+		}
+		fclose($out);
+		rmdir($chunksDir);
+
+		$finfo = finfo_open(FILEINFO_MIME_TYPE);
+		$type = ($finfo && ($detected = finfo_file($finfo, $finalPath)))
+			? $detected
+			: 'application/octet-stream';
+
+		return new FileUploaded($name, $type, (int) filesize($finalPath), $chunk->getUntrustedName());
 	}
 
 

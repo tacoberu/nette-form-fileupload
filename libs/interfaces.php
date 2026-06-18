@@ -43,6 +43,14 @@ interface UploadStore
 
 
 	/**
+	 * Store one chunk of a multi-part upload. Returns null for intermediate chunks;
+	 * returns the assembled FileUploaded when the last chunk (chunkIndex === chunkTotal - 1) arrives.
+	 */
+	function appendChunk(FileUpload $chunk, string $chunkId, int $chunkIndex, int $chunkTotal): ?FileUploaded;
+
+
+
+	/**
 	 * Deleting a directory with a transaction.
 	 */
 	function destroy(): void;
