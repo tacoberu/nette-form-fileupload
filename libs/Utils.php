@@ -13,6 +13,7 @@ use Nette\Forms;
 use Nette\Http\FileUpload;
 use Nette\Utils\Json;
 use LogicException;
+use WeakMap;
 
 
 class Utils
@@ -108,12 +109,12 @@ class Utils
 	static function validateMimeType(Control $control, mixed ...$args): bool
 	{
 		$mimeType = $args[0] ?? '';
-		$mimeTypes = is_array($mimeType) ? $mimeType : explode(',', (string) $mimeType);
+		$mimeTypes = is_array($mimeType)
+			? $mimeType
+			: explode(',', (string) $mimeType);
 		foreach (self::getValueFrom($control) as $file) {
-			$type = strtolower($file->getContentType() ?? '');
-			if (!in_array($type, $mimeTypes, true)
-				&& !in_array(preg_replace('#/.*#', '/*', $type), $mimeTypes, true)
-			) {
+			$type = strtolower($file->getContentType());
+			if (!in_array($type, $mimeTypes, true) && !in_array(preg_replace('#/.*#', '/*', $type), $mimeTypes, true)) {
 				return false;
 			}
 		}
@@ -175,6 +176,57 @@ class Utils
 
 
 
+	/**
+	 * Detects when PHP silently discarded the entire POST body because the total
+	 * upload size exceeded post_max_size, and adds a form-level error.
+	 *
+	 * Why not use Form::validateMaxPostSize()?
+	 * Nette already has this method, but it is gated behind $form->submittedBy,
+	 * which is never set in this scenario. The chain is:
+	 *
+	 *   post_max_size exceeded
+	 *     → PHP empties $_POST and $_FILES before any PHP code runs
+	 *     → Form::receiveHttpData() gets an empty array, CSRF token is missing
+	 *     → returns null → submittedBy = false → isSubmitted() = false
+	 *     → fireEvents() returns immediately, validate() is never called
+	 *     → validateMaxPostSize() is never reached
+	 *
+	 * Even calling validateMaxPostSize() directly would not help because it has
+	 * its own early return: `if (!$this->submittedBy ...) return;`
+	 *
+	 * This method avoids the problem by running inside a monitor() callback,
+	 * which fires when the control is anchored to the form — before Nette
+	 * attempts to determine whether the form was submitted. At that point
+	 * Content-Length is still readable from $_SERVER and the comparison
+	 * Content-Length > post_max_size is a deterministic indicator that PHP
+	 * discarded the body (no other situation produces this condition).
+	 *
+	 * A WeakMap is used so the check runs only once per form even when multiple
+	 * file controls are present.
+	 */
+	static function checkPostMaxSize(Form $form): void
+	{
+		static $checked = null;
+		$checked ??= new WeakMap();
+		if (isset($checked[$form])) {
+			return;
+		}
+		$checked[$form] = true;
+		if (strtoupper((string) (filter_input(INPUT_SERVER, 'REQUEST_METHOD') ?? '')) !== 'POST') {
+			return;
+		}
+		$contentLength = (int) (filter_input(INPUT_SERVER, 'CONTENT_LENGTH') ?? 0);
+		$maxSize = Forms\Helpers::iniGetSize('post_max_size');
+		if ($maxSize > 0 && $contentLength > $maxSize) {
+			$form->addError(sprintf(Forms\Validator::$messages[Form::MaxFileSize], $maxSize));
+		}
+	}
+
+
+
+	/**
+	 * @return array<FileUploaded|FileCurrent>
+	 */
 	private static function getValueFrom(Control $src): array
 	{
 		$xs = $src->getValue();
@@ -183,4 +235,5 @@ class Utils
 		}
 		return $xs;
 	}
+
 }
