@@ -7,6 +7,8 @@
 		"nette",
 		"form",
 		"file",
+		"remote",
+		"upload",
 		"fileupload"
 	],
 	"require": {
