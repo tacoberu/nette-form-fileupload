@@ -16,16 +16,16 @@ $configurator = new Configurator();
 $configurator->enableDebugger(__DIR__ . '/../../var/logs');
 $configurator->setTempDirectory(__DIR__ . '/../../temp');
 
-// Chceme i staré.
+// Include deprecated notices.
 error_reporting(~E_USER_DEPRECATED);
 
 // Specify folder for cache
 umask(0);
 
-// Autoloading tříd demo-aplikace (App\RouterFactory, presentery, …).
+// Autoload demo application classes (App\RouterFactory, presenters, …).
 $configurator->createRobotLoader()
 	->addDirectory(__DIR__)
-	->addDirectory(__DIR__ . '/../libs')
+	//~ ->addDirectory(__DIR__ . '/../libs')
 	->register();
 
 $configurator->addConfig(__DIR__ . '/configs/config.neon');

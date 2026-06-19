@@ -31,10 +31,7 @@ interface UploadStore
 
 
 
-	/**
-	 * @param string $filename Filename of uploaded file.
-	 */
-	function exists(string $filename): bool;
+	function getRealPathFrom(FileUploaded $file): ?string;
 
 
 
@@ -42,6 +39,14 @@ interface UploadStore
 	 * Move the uploaded file to the directory that represents the transaction. Returns the new location.
 	 */
 	function append(FileUpload $file): FileUploaded;
+
+
+
+	/**
+	 * Store one chunk of a multi-part upload. Returns null for intermediate chunks;
+	 * returns the assembled FileUploaded when the last chunk (chunkIndex === chunkTotal - 1) arrives.
+	 */
+	function appendChunk(FileUpload $chunk, string $chunkId, int $chunkIndex, int $chunkTotal): ?FileUploaded;
 
 
 
@@ -63,8 +68,9 @@ interface FilePreviewer
 {
 
 	/**
-	 * @param \Taco\Nette\Forms\Controls\FileUploaded|\Taco\Nette\Forms\Controls\FileCurrent $val
+	 * @param FileControl|MultiFileControl $control
+	 * @param FileUploaded|FileCurrent $val
 	 */
-	function getPreviewControlFor($val): Html;
+	function getPreviewControlFor(UploadStore $store, $control, $val): Html;
 
 }

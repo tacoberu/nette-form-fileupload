@@ -46,13 +46,39 @@ class GenericFilePreviewer implements FilePreviewer
 	private int $format = Image::JPEG;
 
 	/**
-	 * @param FileUploaded | FileCurrent $val
+	 * @var string
 	 */
-	function getPreviewControlFor($val): Html
+	private $basePath;
+
+	function __construct(string $basePath)
 	{
-		$content = self::isImageTypeByFilename($val->getId())
-			? $this->renderContentFor($val)
-			: $this->renderDefaultImageContent($val);
+		$this->basePath = $basePath;
+	}
+
+
+
+	/**
+	 * @param FileControl|MultiFileControl $control
+	 * @param FileUploaded|FileCurrent $val
+	 */
+	function getPreviewControlFor(UploadStore $store, $control, $val): Html
+	{
+		if ($val instanceof FileUploaded) {
+			$path = $store->getRealPathFrom($val);
+			$content = ($path !== null) && self::isImageTypeByFilename($path)
+				? $this->renderContentFor($path)
+				: $this->renderDefaultImageContent($path !== null ? $path : $val->getId());
+		}
+		else {
+			$path = implode(DIRECTORY_SEPARATOR, [
+				$this->basePath,
+				$val->getId(),
+			]);
+			$content = file_exists($path)
+				? $this->renderContentFor($path)
+				: $this->renderDefaultImageContent($path);
+		}
+
 		return Html::el('img')
 			->setAttribute('src', 'data:' . Image::typeToMimeType($this->format) . ';base64, ' . base64_encode($content))
 			->setAttribute('alt', $val->getName());
@@ -63,29 +89,25 @@ class GenericFilePreviewer implements FilePreviewer
 	/**
 	 * Renders a thumbnail of the image, or a generic icon when the file
 	 * is not a loadable image (wrong type, missing or unreadable file).
-	 * @param FileUploaded | FileCurrent $src
 	 */
-	private function renderContentFor($src): string
+	private function renderContentFor(string $path): string
 	{
 		try {
-			$image = Image::fromFile($src->getId());
+			$image = Image::fromFile($path);
 			$image->resize($this->width, $this->height, $this->flag);
 			return $image->toString($this->format, $this->quality);
 		}
 		catch (ImageException $exception) {
-			return $this->renderDefaultImageContent($src);
+			return $this->renderDefaultImageContent($path);
 		}
 	}
 
 
 
-	/**
-	 * @param FileUploaded | FileCurrent $src
-	 */
-	private function renderDefaultImageContent($src): string
+	private function renderDefaultImageContent(string $path): string
 	{
 		$image = Image::fromBlank($this->width, $this->height, Image::rgb(190, 190, 190));
-		$image->string(8, 8, 8, self::getFileExtension($src->getId()), $image->colorAllocate(0, 0, 0));
+		$image->string(8, 8, 8, self::getFileExtension($path), $image->colorAllocate(0, 0, 0));
 		return $image->toString($this->format, $this->quality);
 	}
 

@@ -30,8 +30,9 @@ class DashboardPresenter extends BasePresenter
 		$this['fileForm']->setDefaults([
 			'title' => 'Abc',
 			'content' => 'Lorem ipsum doler ist.',
-			'portrait2' => new FileCurrent("uploaded/account/56695/mp16.jpg", "image/jpeg"),
-			'portrait5' => new FileCurrent(self::ImageFile, "image/jpeg"),
+			'portrait1' => new FileCurrent("uploaded/account/56695/mp16.jpg", "image/jpeg", 42, "Moje cosi"),
+			'portrait2' => new FileCurrent("uploaded/account/56695/mp16.jpg", "image/jpeg", 42, "Moje cosi"),
+			//~ 'portrait5' => new FileCurrent(self::ImageFile, "image/jpeg"),
 		]);
 	}
 
@@ -43,9 +44,47 @@ class DashboardPresenter extends BasePresenter
 			'title' => 'Abc',
 			'content' => 'Lorem ipsum doler ist.',
 			'attachments2' => [
-				new FileCurrent(self::ImageFile, "image/jpeg"),
+				new FileCurrent("uploaded/account/56695/mp16.jpg", "image/jpeg", 42, "Moje cosi"),
+				//~ new FileCurrent(self::ImageFile, "image/jpeg"),
 			],
 		]);
+	}
+
+
+
+	protected function createComponentBioForm()
+	{
+		$form = $this->makeForm();
+
+		$form->addText('title', 'Title a:')
+			->setRequired('Please enter a title.');
+		$form->addTextarea('content', 'Content:')
+			->setRequired('Please enter a content.');
+
+		$form->addFileControl('portrait', 'Portrait')
+			->setPreviewer(new GenericFilePreviewer(__dir__ . '/../../data'))
+			->setRequired('Please enter a content.');
+
+		$form->setCurrentGroup(NULL);
+		$form->addSubmit('submit', 'Save')
+			->setAttribute('class', 'default');
+
+		$form->addSubmit('cancel', 'Cancel')
+			->setValidationScope([]);
+
+		$form->onSuccess[] = static function($form, $values) {
+			dump($values);
+			//~ $form['portrait']->destroyStore();
+			//~ $form['portrait2']->destroyStore();
+			//~ $form['portrait3']->destroyStore();
+			//~ $form['portrait4']->destroyStore();
+			//~ $form['portrait5']->destroyStore();
+			//~ $form['portrait6']->destroyStore();
+			//~ $form['portrait7']->destroyStore();
+			//~ die("\n------\n" . __file__ . ':' . __line__ . "\n");
+		};
+
+		return $form;
 	}
 
 
@@ -54,39 +93,41 @@ class DashboardPresenter extends BasePresenter
 	{
 		$form = $this->makeForm();
 
-		$store = new UploadStoreTemp('uploading/trx-', Null, __dir__ . '/../../../temp');
+		$previewer = new GenericFilePreviewer(__dir__ . '/../../data');
+		$store = new UploadStoreTemp('uploading/trx-', null, __dir__ . '/../../../temp');
 
 		$form->addText('title', 'Title a:')
 			->setRequired('Please enter a title.');
 		$form->addTextarea('content', 'Content:')
 			->setRequired('Please enter a content.');
 
-		$form->addFileControl('portrait1', 'Portrait');
+		$form->addFileControl('portrait1', 'Portrait')
+			->setPreviewer($previewer);
 		$form->addFileControl('portrait2', 'Portrait 2', $store);
 		$form['portrait2']->getRemoveButtonPrototype()
 			->setValue('Smazat');
 		$form->addFileControl('portrait3','Portrait 3')
-			->setPreviewer(new GenericFilePreviewer());
+			->setPreviewer($previewer);
 		$form['portrait4'] = $this->fileUploadFactory->addUploadControl('Portrait 4');
 		$form['portrait5'] = $this->fileUploadFactory
 			->addUploadControl('Portrait 5')
-			->setPreviewer(new GenericFilePreviewer());
+			->setPreviewer($previewer);
 		$form['portrait5']
 			->getRemoveButtonPrototype()
 			->setValue('Smazat')
 			->setTitle('Smazat');
 		$form->addFileControl('portrait6', 'Portrait 6')
-			->setOption("description", "Povinná položka")
+			->setOption("description", "Required field")
 			->setRequired()
-			->addRule($form::MaxFileSize, "Maximální velikost souboru %d bytů.", 255);
+			->addRule($form::MaxFileSize, "File size must not exceed %d bytes.", 255);
 
-		$form->addCheckbox("aux", "Příloha?");
+		$form->addCheckbox("aux", "Attachment?");
 
 		$form->addFileControl('portrait7', 'Portrait 7')
-			->setOption("description", "Povinná položka, je-li zaškrtnuta příloha.");
+			->setOption("description", "Required when attachment is checked.");
 		$form['portrait7']
 			->addConditionOn($form['aux'], $form::Equal, true)
-				->setRequired("Vyžadován %name");
+				->setRequired("Required: %name");
 
 		$form->setCurrentGroup(NULL);
 		$form->addSubmit('submit', 'Save')
@@ -118,6 +159,7 @@ class DashboardPresenter extends BasePresenter
 	protected function createComponentFilesForm()
 	{
 		$form = $this->makeForm();
+		$previewer = new GenericFilePreviewer(__dir__ . '/../../data');
 
 		$form->addText('title', 'Title:')
 			->setRequired('Please enter a title.');
@@ -125,10 +167,9 @@ class DashboardPresenter extends BasePresenter
 			->setRequired('Please enter a content.');
 
 		$form->addMultiFileControl('attachments1', 'Attachments 1')
-			->setPreviewer(new GenericFilePreviewer());
+			->setPreviewer($previewer);
 
-		$form->addMultiFileControl('attachments2', 'Attachments 2')
-			->setPreviewer(new GenericFilePreviewer());
+		$form->addMultiFileControl('attachments2', 'Attachments 2');
 
 		$form->setCurrentGroup(NULL);
 		$form->addSubmit('submit', 'Save')
@@ -154,7 +195,7 @@ class DashboardPresenter extends BasePresenter
 		$form->onSuccess[] = $this->createProcessSubmitted();
 		$form->onAnchor[] = static function($form) {
 			if ( ! $form->isSubmitted()) {
-				// Nějaká inicializace původních dat
+				// Initialize default values here if needed
 			}
 		};
 

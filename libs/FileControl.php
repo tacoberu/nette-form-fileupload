@@ -8,10 +8,14 @@
 namespace Taco\Nette\Forms\Controls;
 
 use Nette\Forms\Form;
+use Nette\Forms\Controls\BaseControl;
 use Nette\Forms\Controls\UploadControl as NetteUploadControl;
-use Nette\Forms\Controls\SubmitButton;
 use Nette\Forms\Container;
+use Nette\Forms;
 use Nette\Utils\Html;
+use Nette\Application\UI\Presenter;
+use Nette\Application\UI\SignalReceiver;
+use Nette\InvalidStateException;
 use LogicException;
 
 
@@ -27,19 +31,12 @@ use LogicException;
  *
  * @author Martin Takáč <martin@takac.name>
  */
-class FileControl extends NetteUploadControl
+class FileControl extends BaseControl implements SignalReceiver
 {
 
+	use FileControlUnit;
+
 	const RemoveButtonLabel = "✕"; // &#x2715;
-
-	/**
-	 * A repository holding uploaded files before they are actually saved.
-	 * By default it's just a temp directory, see UploadStoreTemp
-	 * @readonly
-	 */
-	private UploadStore $store;
-
-	private ?FilePreviewer $previewer = Null;
 
 	/**
 	 * @readonly
@@ -61,14 +58,12 @@ class FileControl extends NetteUploadControl
 	/**
 	 * @readonly
 	 */
-	private Html $previewControl;
+	private Html $labelControl;
 
 	/**
 	 * @readonly
 	 */
 	private Html $transactionControl;
-
-	private string $prefix = "taco-filecontrol";
 
 	/**
 	 * Registers a form extension method `add{$name}` (default `addFileControl`),
@@ -96,42 +91,45 @@ class FileControl extends NetteUploadControl
 	 */
 	function __construct($label = null, ?UploadStore $store = Null)
 	{
-		parent::__construct($label, false);
+		parent::__construct($label);
+
+		// File upload setup — replaces what UploadControl's constructor did.
+		$this->control->type = 'file';
+		$this->setOption('type', 'file');
+		$this->addCondition(true)
+			->addRule([$this, 'isOk'], Forms\Validator::$messages[NetteUploadControl::Valid]);
+		$this->monitor(Form::class, static function (Form $form): void {
+			if (!$form->isMethod('post')) {
+				throw new InvalidStateException('File upload requires method POST.');
+			}
+			$form->getElementPrototype()->enctype = 'multipart/form-data';
+		});
 
 		$this->setHtmlAttribute('data-taco-type', 'file');
 		$this->store = $store instanceof UploadStore
 			? $store
 			: new UploadStoreTemp();
 		$this->container = Html::el('div', [
-			'class' => $this->formatClass(Null),
+			'class' => $this->formatClass(Null) . ' ' . $this->formatClass('single'),
 		]);
 		$this->removeButton = Html::el('input', [
 			'type' => 'submit',
 			'value' => $this->translate(self::RemoveButtonLabel),
 			'title' => $this->translate('Remove'),
 			'formnovalidate' => '',
+			'class' => $this->formatClass('remove'),
 		]);
 		$this->currentControl = Html::el('input', [
 			'readonly' => 1,
 			'style' => 'display: none',
 		]);
-		$this->previewControl = Html::el('input', [
+		$this->labelControl = Html::el('input', [
 			'readonly' => 1,
+			'class' => $this->formatClass('label'),
 		]);
 		$this->transactionControl = Html::el('input', [
 			'type' => 'hidden',
 		]);
-	}
-
-
-
-	/**
-	 * By setting the previewer, uploaded files will be represented by their respective previews.
-	 */
-	function setPreviewer(FilePreviewer $var): self
-	{
-		$this->previewer = $var;
-		return $this;
 	}
 
 
@@ -155,11 +153,7 @@ class FileControl extends NetteUploadControl
 			}
 		}
 		elseif ($rawvalue = $this->getHttpData(Form::DataText, '[current]')) {
-			$value = Utils::createFileUploadedFromValue($rawvalue);
-			// If it's in the store, it's not committed. How else would he get here?
-			$this->value = $this->store->exists($value->getId())
-				? $value
-				: Utils::createFileCurrentFromValue($rawvalue);
+			$this->value = Utils::createFileValueFromRaw($rawvalue);
 		}
 		else {
 			$this->value = null;
@@ -172,7 +166,7 @@ class FileControl extends NetteUploadControl
 		if ($this->getHttpData(Form::DataLine, '[remove]')) {
 			$this->value = null;
 			$form = $this->getForm();
-			$button = new SubmitButton();
+			$button = new Forms\Controls\SubmitButton();
 			$button->setValidationScope([]);
 			$button->onClick[] = static function () use ($form): void {
 				$form->onSuccess = $form->onError = $form->onSubmit = [];
@@ -184,34 +178,11 @@ class FileControl extends NetteUploadControl
 
 
 	/**
-	 * Have been all files successfully uploaded?
+	 * @return FileUploaded|FileCurrent|null
 	 */
-	function isOk(): bool
+	function getValue()
 	{
-		return True;
-	}
-
-
-
-	/**
-	 * Has been any file uploaded?
-	 */
-	function isFilled(): bool
-	{
-		if (empty($this->value)) {
-			return False;
-		}
-		return $this->value->isFilled();
-	}
-
-
-
-	/**
-	 * Explicitní vymazání transakce.
-	 */
-	function destroyStore(): void
-	{
-		$this->store->destroy();
+		return $this->value;
 	}
 
 
@@ -240,34 +211,30 @@ class FileControl extends NetteUploadControl
 	 */
 	function getControl()
 	{
-		switch (True) {
-			// Existující soubor
-			case $this->value instanceof FileCurrent:
-			// Some file in the transaction.
-			// The second round of the form
-			case $this->value instanceof FileUploaded:
-				$name = $this->getHtmlName();
-				$container = clone $this->container;
-				return $container
-					->addHtml($this->getCurrentPart($name, $this->value))
-					->addHtml($this->getPreviewControlPart($this->value))
-					->addHtml($this->getRemoveButtonPart($name))
-					->addHtml($this->getNewControlPart($name, True))
-					->addHtml($this->getTransactionControlPart($name));
-
-			// No file selected
-			// No default file
-			// The first round of the form
-			case empty($this->value):
-				$name = $this->getHtmlName();
-				$container = clone $this->container;
-				return $container
-					->addHtml($this->getNewControlPart($name, False))
-					->addHtml($this->getTransactionControlPart($name));
-
-			default:
-				throw new LogicException("oops");
+		$name = $this->getHtmlName();
+		$container = clone $this->container;
+		if ($this->lookup(Presenter::class, false) !== null) {
+			$container->setAttribute('data-upload-url', $this->link(':upload!'));
+			$chunkSize = Forms\Helpers::iniGetSize('upload_max_filesize') - 100 * 1024;
+			$container->setAttribute('data-chunk-size', (string) max(1, $chunkSize));
 		}
+
+		if ($this->value instanceof FileCurrent || $this->value instanceof FileUploaded) {
+			return $container
+				->addHtml($this->getCurrentPart($name, $this->value))
+				->addHtml($this->getPreviewControlPart($this->value))
+				->addHtml($this->getRemoveButtonPart($name))
+				->addHtml($this->getNewControlPart($name, True))
+				->addHtml($this->getTransactionControlPart($name));
+		}
+
+		if (empty($this->value)) {
+			return $container
+				->addHtml($this->getNewControlPart($name, False))
+				->addHtml($this->getTransactionControlPart($name));
+		}
+
+		throw new LogicException("oops");
 	}
 
 
@@ -302,17 +269,7 @@ class FileControl extends NetteUploadControl
 
 
 	/**
-	 * Returns current file HTML element template.
-	 */
-	function getCurrentControlPrototype(): Html
-	{
-		return $this->currentControl;
-	}
-
-
-
-	/**
-	 * @param FileUploaded | FileCurrent $value
+	 * @param FileUploaded|FileCurrent $value
 	 */
 	function getCurrentPart(string $name, $value): Html
 	{
@@ -324,24 +281,34 @@ class FileControl extends NetteUploadControl
 
 
 
-	function getPreviewControlPrototype(): Html
+	function getLabelControlPrototype(): Html
 	{
-		return $this->previewControl;
+		return $this->labelControl;
 	}
 
 
 
 	/**
-	 * @param FileUploaded | FileCurrent $src
+	 * @return Html|string
+	 */
+	function getUploadControlPrototype()
+	{
+		return parent::getControl();
+	}
+
+
+
+	/**
+	 * @param FileUploaded|FileCurrent $src
 	 */
 	function getPreviewControlPart($src): Html
 	{
-		if (!$this->previewer instanceof FilePreviewer) {
-			$el = clone $this->previewControl;
+		if (empty($this->previewer)) {
+			$el = clone $this->labelControl;
 			$el->value = $src->getName();
 			return $el;
 		}
-		return $this->previewer->getPreviewControlFor($src);
+		return $this->previewer->getPreviewControlFor($this->store, $this, $src);
 	}
 
 
@@ -354,10 +321,11 @@ class FileControl extends NetteUploadControl
 		}
 		$el = clone $el;
 		$el->name = $name . '[new]';
-		// Existenci validujeme podle $name[current], ale nový záznam podle $name[new].
+		$el->appendAttribute('class', $this->formatClass('upload'));
+		// Presence is validated via $name[current]; new uploads via $name[new].
 		if ($withoutRequired) {
 			unset($el->required);
-			$el->setAttribute('data-nette-rules', Utils::removeFilledRules($el->getAttribute('data-nette-rules')));
+			$el->setAttribute('data-nette-rules', Utils::removeFilledRules($el->getAttribute('data-nette-rules') ?? []));
 		}
 		return $el;
 	}
@@ -370,15 +338,6 @@ class FileControl extends NetteUploadControl
 		$el->name = $name . '[transaction]';
 		$el->value = (string) $this->store->getId();
 		return $el;
-	}
-
-
-
-	private function formatClass(?string $suffix): string
-	{
-		return $suffix
-			? "{$this->prefix}-{$suffix}"
-			: $this->prefix;
 	}
 
 }
