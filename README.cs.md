@@ -1,108 +1,116 @@
 Nette form FileControl
 ======================
 
-Nahrávání souborů je snadné. Pokud je ale soubor již nahraný v systému, je někdy potřeba
+**FileControl** a **MultiFileControl** jsou Nette form inputy pro nahrávání souborů, které se **chovají stejně jako ostatní Nette inputy**: `setValue()` nastavuje hodnotu, `getValue()` ji vrací, validace, podmíněná validace i error messages fungují identicky jako u textových či select inputů.
 
-- jej pouze zobrazit (nejlépe s náhledem),
-- nebo soubor smazat,
-- nebo soubor nahradit jinou verzí.
+Standardní `<input type="file">` má při editaci existujících dat několik nepříjemností:
 
-Se standardním inputem typu file je několik potíží:
-
-1. Je nepohodlné, že nejde rozumným způsobem zobrazit původní soubor — na rozdíl od ostatních inputů, kde lze původní hodnotu zobrazit.
+1. Nelze rozumně zobrazit původní soubor — na rozdíl od ostatních inputů, kde lze původní hodnotu jednoduše zobrazit.
 2. S tím souvisí i to, jak existující soubor smazat.
-3. Nepohodlné je, když vznikne nesouvisející chyba jinde ve formuláři. Formulář je tedy vrácen, ať si to uživatel opraví — jenže nahrávaný soubor (či soubory) je nutné navolit znovu.
-4. Při nahrávání souboru formulářem je práce se soubory *jiná* než s ostatními položkami.
-5. Kapitola sama o sobě je nahrávání velkých souborů.
+3. Při nesouvisející chybě jinde ve formuláři musí uživatel nahrávat soubor znovu.
+4. Nahrávání velkých souborů je kapitola sama o sobě.
 
-**FileControl** se toto snaží řešit několika technikami:
+FileControl toto řeší:
 
-1. Existující soubor je vyjádřen hodnotou třídy `FileCurrent`. Pokud jej uživatel smaže, je ve formuláři hodnota třídy `FileCurrent` s vlastností `remove` nastavenou na `True`.
-2. Všechny nahrávané soubory se ukládají v transakci. Jednou nahraný soubor je uschován ve speciálním úložišti (v defaultu řešeném jako adresář v tempu, lze změnit) a po úspěšném uložení formuláře zanesen do systému.
+1. Existující soubor je reprezentován hodnotou třídy `FileCurrent`. Pokud jej uživatel smaže, formulář to ví.
+2. Nahrávané soubory se ukládají v transakci — jednou nahraný soubor není potřeba nahrávat znovu, i když formulář selže z jiného důvodu.
 
-Obrázkové soubory je možné reprezentovat jako obrázky. Pokud standardní renderer nevyhovuje, lze nastavit vlastní.
+Hodnota inputu může být:
 
-Hodnota inputu může nabývat tří možností:
-
-- `Null`: žádný, nebo původní soubor smazán
-- `FileUploaded`: nahraný nový soubor
-- `FileCurrent`: původní soubor uložený v systému
+- `null` — žádný soubor, nebo původní soubor smazán
+- `FileUploaded` — nově nahraný soubor (uložený v transakci, čeká na commit do systému)
+- `FileCurrent` — původní soubor uložený v systému
 
 
-## Instalace
-```
-composer require tacoberu/nette-form-fileupload
-```
+## Verze a požadavky
+
+| Branch | PHP | Nette |
+|--------|-----|-------|
+| `v2.0` | >= 8.1 | ^3.2 |
+| `v1.2` | >= 7.4 | ^3.1 |
 
 
-### Použití
-Do `config.neon` je potřeba rozšíření zaregistrovat a nakonfigurovat:
+
+## Rychlý start
+
+Do `config.neon` zaregistrujte rozšíření:
+
 ```neon
 extensions:
-	filecontrol: Taco\Nette\Forms\Controls\FileControlExtension
-
+    filecontrol: Taco\Nette\Forms\Controls\FileControlExtension
 
 filecontrol:
-	store: Taco\Nette\Forms\Controls\UploadStoreTemp('uploading/txt-', baseDir: %tempDir%)
-
+    store: Taco\Nette\Forms\Controls\UploadStoreTemp('uploading/txt-', null, %tempDir%)
 ```
 
-Ve formuláři pak lze použít:
+Ve formuláři:
+
 ```php
-use Taco\Nette\Forms\Controls\FileCurrent;
-use Taco\Nette\Forms\Controls\FileControl;
-use Taco\Nette\Forms\Controls\GenericFilePreviewer;
-
-$form = new Nette\Forms\Form;
-
 $form->addFileControl('portrait', 'Portrait');
-$form->addMultiFileControl('attachments1', 'Attachments 1');
+$form->addMultiFileControl('attachments', 'Přílohy');
 ```
 
 Formulář s jedním souborem (`FileControl`) — u nahraného souboru je tlačítko pro smazání:
 
 ![Formulář s FileControl](docs/file.png)
 
-Formulář s více soubory (`MultiFileControl`) — s náhledy obrázků, mazáním jednotlivých položek (✕) a tlačítkem ↻ pro přednahrání bez odeslání celého formuláře:
+Formulář s více soubory (`MultiFileControl`) — s náhledy obrázků, mazáním položek (✕) a tlačítkem ↻ pro přednahrání:
 
 ![Formulář s MultiFileControl](docs/files.png)
 
+![Typický formulář s avatarem](docs/bio.png)
+
+Spustitelné ukázky jsou v adresáři [`examples/`](examples/).
 
 
-## Co FileControl a MultiFileControl podporují
+## Funkce
 
-### Provoz bez JS
+### Funguje bez JS
 
-**Controly jsou plně funkční i bez JavaScriptu.** Tlačítko ↻ umožňuje uživateli nahrát soubory před odesláním formuláře — stránka provede celý round-trip, ale stav formuláře se zachová. Validace, zobrazení chyb i transakční mechanismus fungují stejně.
+**Controly jsou plně funkční i bez JavaScriptu.** Tlačítko ↻ umožňuje nahrát soubory před odesláním formuláře — stránka provede round-trip, ale stav formuláře se zachová. Validace, chyby i transakce fungují stejně.
 
-### AJAX nahrávání s chunked přenosem
+### JS vylepšení: AJAX nahrávání a doplňky k tlačítku ↻
 
-Součástí balíčku jsou **připravené TypeScript a zkompilované JavaScript funkce** (`assets/filecontrol.ts` / `assets/filecontrol.js`), které lze zakomponovat do libovolného existujícího frontendu. Poskytují:
+I bez JS jsou controly plně funkční (viz výše) — tlačítko ↻ je vidět a uživatel na něj kliká sám. `assets/filecontrol.ts` / `assets/filecontrol.js` nad tímto základem nabízí volitelná JS vylepšení, která lze zakomponovat do libovolného frontendu:
 
-- **Okamžité nahrání po výběru souboru** — není potřeba klikat ↻ ani odesílat formulář
-- **Chunked přenos pro velké soubory** — soubory jsou automaticky rozděleny tak, aby každý POST zůstal pod limitem `upload_max_filesize` PHP; server je v adresáři transakce poskládá zpět
-- **Progress bar** — během chunked přenosu se zobrazuje `<progress>` element
-- **Inline náhled** — po nahrání server vrátí vykreslený náhled nebo jmenovku souboru, která se vloží do stránky bez přenačtení
+- `initMultiFileAjaxUpload(container)` — nahradí round-trip okamžitým AJAX nahráním pro `MultiFileControl`. Spustí se podle atributu `data-upload-url` na containeru — ten si knihovna nastaví sama, je-li control vykreslen v rámci Presenteru, takže o něj není potřeba se starat.
+- `initFileAjaxUpload(container)` — totéž pro `FileControl`.
+- `initMultiFileAutoPreload(container)` — pro případy, kdy AJAX URL k dispozici není: skryje tlačítko ↻ a po výběru souborů ho za uživatele samo "klikne", takže round-trip proběhne automaticky místo ručního kliknutí.
+- `initFileHideOnNew(container)` — obdoba pro `FileControl`: po výběru nového souboru skryje tlačítko pro smazání a popisek původního souboru, aby nepřekážely.
+- `initFileClearButton(fileInput)` — přidá za `<input type="file">` tlačítko ✕ pro vyčištění vybraných souborů.
 
-Malé soubory (pod `upload_max_filesize − 100 KB`) jsou odeslány jako jeden POST. Funkce jsou exportovány jako ES moduly a lze je importovat selektivně:
+Vlastnosti AJAX nahrávání (`initMultiFileAjaxUpload` / `initFileAjaxUpload`):
+
+- **Okamžité nahrání po výběru** — není potřeba klikat ↻ ani odesílat formulář
+- **Chunked přenos pro velké soubory** — soubory se automaticky rozdělí, aby každý POST byl pod `upload_max_filesize`; server je v transakci složí zpět
+- **Progress bar** — `<progress>` element během chunked přenosu
+- **Inline náhled** — server vrátí náhled nebo jmenovku souboru, vloží se bez přenačtení stránky
 
 ```js
-import { initMultiFileAjaxUpload, initFileAjaxUpload } from './filecontrol.js';
+import {
+    initMultiFileAjaxUpload, initMultiFileAutoPreload,
+    initFileAjaxUpload, initFileHideOnNew, initFileClearButton,
+} from './filecontrol.js';
 
+// data-upload-url si nastavuje knihovna sama, je-li control vykreslen v Presenteru —
+// tady se podle něj jen rozhoduje, zda zapojit AJAX, nebo JS doplněk k ručnímu ↻.
 document.querySelectorAll('[data-taco-type="file multiple"]').forEach(el => {
-    initMultiFileAjaxUpload(el);
+    el.dataset.uploadUrl ? initMultiFileAjaxUpload(el) : initMultiFileAutoPreload(el);
 });
 document.querySelectorAll('.taco-filecontrol-single').forEach(el => {
-    initFileAjaxUpload(el);
+    el.dataset.uploadUrl ? initFileAjaxUpload(el) : initFileHideOnNew(el);
 });
+document.querySelectorAll('.taco-filecontrol-single input[type="file"]')
+    .forEach(initFileClearButton);
 ```
 
 ### Validace
 
-Oba controly přepisují Nette vestavěné validátory souborů tak, aby fungovaly s hodnotami `FileCurrent` i `FileUploaded` (Nette originály akceptují jen `FileUpload`):
+Funguje stejně jako u jiných Nette inputů — plně kompatibilní s `addConditionOn()`, `addRule()` i chybovými hláškami:
 
 ```php
 $form->addFileControl('portrait', 'Portrait')
+    ->setRequired('Vyberte prosím soubor.')
     ->addRule($form::MaxFileSize, 'Soubor je příliš velký (max %d B).', 512 * 1024)
     ->addRule($form::MimeType, 'Povoleny jsou jen obrázky.', ['image/jpeg', 'image/png'])
     ->addRule($form::Image, 'Soubor musí být obrázek.');
@@ -110,31 +118,15 @@ $form->addFileControl('portrait', 'Portrait')
 
 | Pravidlo | Popis |
 |---|---|
-| `Form::MaxFileSize` | Maximální velikost souboru v bajtech. Defaultně je nastaven limit `upload_max_filesize` z php.ini. |
+| `Form::Required` / `setRequired()` | Soubor musí být vybrán nebo již existovat jako `FileCurrent`. |
+| `Form::MaxFileSize` | Maximální velikost souboru v bajtech. |
 | `Form::MimeType` | Povolené MIME typy, např. `'image/jpeg'` nebo pole typů. |
-| `Form::Image` | Zkratka pro podporované formáty obrázků (`image/jpeg`, `image/png`, `image/gif`, `image/webp`). |
-| `Form::Required` / `setRequired()` | Standardní Nette povinné pole — soubor musí být vybrán nebo již existovat jako `FileCurrent`. |
-
-Podmíněná validace pomocí `addConditionOn()` funguje stejně jako u ostatních Nette controlů.
+| `Form::Image` | Zkratka pro podporované formáty (`image/jpeg`, `image/png`, `image/gif`, `image/webp`). |
 
 ### Chyby nahrávání
 
-Pokud PHP odmítne soubor (chyba na úrovni serveru), control přidá k sobě chybovou zprávu:
-
-- **Jeden soubor překročí `upload_max_filesize`** — PHP označí soubor chybou `UPLOAD_ERR_INI_SIZE`, control zobrazí zprávu s hodnotou limitu.
-- **Součet souborů překročí `post_max_size`** — PHP tiše vyprázdní celý POST. Control to detekuje z `Content-Length` a přidá chybu na úrovni formuláře ještě před detekcí odeslání.
-
-### Hodnoty
-
-`FileControl::getValue()` vrací:
-
-| Typ | Situace |
-|---|---|
-| `FileCurrent` | Existující soubor z minulého uložení (nebo výchozí hodnota). |
-| `FileUploaded` | Nově nahraný soubor (uložený v transakci), který je třeba uložit do systému. |
-| `null` | Žádný soubor, nebo soubor byl smazán - je třeba smazat ze systému. |
-
-`MultiFileControl::getValue()` vrací pole (může být prázdné), jehož prvky jsou `FileCurrent` nebo `FileUploaded`.
+- **Soubor překročí `upload_max_filesize`** — PHP označí soubor chybou `UPLOAD_ERR_INI_SIZE`, control zobrazí zprávu s hodnotou limitu.
+- **Součet souborů překročí `post_max_size`** — PHP tiše vyprázdní celý POST. Control to detekuje z `Content-Length` a přidá chybovou zprávu na úrovni formuláře.
 
 ---
 
@@ -142,60 +134,42 @@ Pokud PHP odmítne soubor (chyba na úrovni serveru), control přidá k sobě ch
 
 ### setPreviewer()
 
-FileControlu je možné nastavit previewer, kterým lze ovlivnit, jak se budou náhledy na soubor formátovat. Použitím `GenericFilePreviewer` je k dispozici náhled obrázkového souboru.
+Nastavení previeweru pro formátování náhledů. `GenericFilePreviewer` zobrazuje náhledy obrázků.
 
 ### getRemoveButtonPrototype()
 
-Možnost ovlivnit vzhled mazacího tlačítka: label, třídy, title.
-
-
-### getCurrentControlPrototype()
-
-Možnost ovlivnit, jak bude input vypadat, má-li vybranou hodnotu.
-
-
-### getPreviewControlPart()
-
-Možnost ovlivnit náhled souboru bez použití previeweru.
-
+Přizpůsobení mazacího tlačítka: label, třídy, title.
 
 ### Transakce
 
-Když je soubor úspěšně nahrán na server, je automaticky přesunut do úložiště — transakce. To poslouží k tomu, že pokud není formulář zpracován, ale je například z důvodu validace předán zpět uživateli, není nutné soubor nahrávat znova. Po úspěšném zpracování je soubor k dispozici pomocí `$control->getValue()` jako ostatní hodnoty.
+Nahraný soubor je automaticky přesunut do úložiště (transakce). Díky tomu není nutné soubor nahrávat znovu při validační chybě. Po úspěšném zpracování je dostupný přes `getValue()` jako ostatní hodnoty.
 
-Pokud je formulář zahozen, například uživatel zavře stránku, nebo stiskne storno, nahrané soubory jsou v transakci a nikde nepřekáží.
-
-Poté, co je soubor nahrán do systému, je možné transakci zahodit — tedy v případě použití defaultního úložiště `UploadStoreTemp` smazat adresář. To lze udělat buď explicitně:
+Po uložení do systému lze transakci zahodit explicitně:
 
 ```php
 $form['portrait']->destroyStore();
 ```
 
-Nebo to nechat na GC, který jej za určitou dobu smaže automaticky.
-
-#### UploadStoreTemp, GC
-
-Automatické promazávání je implementováno v `UploadStoreTemp`. Chová se to tak, že po ukončení stránky se díky destruktoru projdou všechny patřičné transakce a zkontroluje se, zda je transakce starší než `UploadStoreTemp::$gcAgeLimit`.
-Aby se rozložila zátěž, smaže se tak pouze `UploadStoreTemp::$gcMaxCount` transakcí/adresářů.
-
-Toto chování je záležitostí pouze implementace `UploadStoreTemp`.
+Nebo ji nechat na GC, který ji smaže automaticky po uplynutí `UploadStoreTemp::$gcAgeLimit`.
 
 
-## Assets (TypeScript)
+## Sestavení assets (TypeScript)
 
-The client-side scripts are written in TypeScript and compiled to `assets/filecontrol.js` (symlinked into `examples/document_root/js/`):
+```bash
+npm run build:assets
+```
 
-	npm run build:assets
+Zkompilovaný soubor: `assets/filecontrol.js` (symlink v `examples/document_root/js/`).
 
 
 ## E2E testy (Playwright)
 
-	npm install
-	npx playwright install chromium  # jen poprvé
+```bash
+npm install
+npx playwright install chromium  # jen poprvé
 
-	npm run test:e2e        # spustit testy
-	npm run test:e2e:ui     # interaktivní UI
+npm run test:e2e        # spustit testy
+npm run test:e2e:ui     # interaktivní UI
+```
 
-Výstupy (report, výsledky) se ukládají do `temp/`.
-
-Adresa testované aplikace se nastavuje v `.env` přes `APP_URL`.
+Adresa testované aplikace se nastavuje v `.env` přes `APP_URL`. Výstupy se ukládají do `temp/`.
