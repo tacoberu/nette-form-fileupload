@@ -111,6 +111,7 @@ class MultiFileControl extends BaseControl implements SignalReceiver
 				throw new InvalidStateException('File upload requires method POST.');
 			}
 			$form->getElementPrototype()->enctype = 'multipart/form-data';
+			Utils::checkPostMaxSize($form);
 		});
 
 		$this->container = Html::el('div', [

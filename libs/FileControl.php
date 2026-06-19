@@ -103,6 +103,7 @@ class FileControl extends BaseControl implements SignalReceiver
 				throw new InvalidStateException('File upload requires method POST.');
 			}
 			$form->getElementPrototype()->enctype = 'multipart/form-data';
+			Utils::checkPostMaxSize($form);
 		});
 
 		$this->setHtmlAttribute('data-taco-type', 'file');
