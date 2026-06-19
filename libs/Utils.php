@@ -148,7 +148,8 @@ class Utils
 			case UPLOAD_ERR_OK:
 				throw new LogicException('No error.');
 			case UPLOAD_ERR_INI_SIZE:
-				$message = "The uploaded file exceeds the upload_max_filesize directive in php.ini";
+				$limit = Forms\Helpers::iniGetSize('upload_max_filesize');
+				$message = sprintf(Forms\Validator::$messages[Form::MaxFileSize], $limit);
 				break;
 			case UPLOAD_ERR_FORM_SIZE:
 				$message = "The uploaded file exceeds the MAX_FILE_SIZE directive that was specified in the HTML form";
