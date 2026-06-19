@@ -71,6 +71,18 @@ Formulář s více soubory (`MultiFileControl`) — s náhledy obrázků, mazán
 
 ## Co FileControl a MultiFileControl podporují
 
+### AJAX nahrávání s chunked přenosem
+
+Pokud je control vložen do Nette `Presenter`u, soubory se nahrají okamžitě po výběru — bez čekání na odeslání formuláře.
+
+Velké soubory jsou **automaticky rozděleny na chunky** tak, aby každý jednotlivý POST zůstal pod limitem `upload_max_filesize` PHP. Chunky jsou na serveru poskládány zpět v adresáři transakce. Klient zobrazuje `<progress>` bar po dobu přenosu.
+
+Malé soubory (pod `upload_max_filesize − 100 KB`) jsou odeslány jako jeden POST.
+
+Po úspěšném nahrání server vrátí vykreslený náhled (miniaturu nebo jmenovku souboru), který se okamžitě vloží do stránky bez přenačtení.
+
+No-JS fallback (tlačítko ↻ pro přednahrání) stále funguje v prostředích bez JavaScriptu.
+
 ### Validace
 
 Oba controly přepisují Nette vestavěné validátory souborů tak, aby fungovaly s hodnotami `FileCurrent` i `FileUploaded` (Nette originály akceptují jen `FileUpload`):

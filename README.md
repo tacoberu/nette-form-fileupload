@@ -69,6 +69,63 @@ A form with multiple files (`MultiFileControl`) — with image previews, deletio
 
 
 
+## What FileControl and MultiFileControl support
+
+### AJAX upload with chunked transfer
+
+When either control is embedded inside a Nette `Presenter`, files are uploaded immediately after the user selects them — without waiting for the form to be submitted.
+
+Large files are **automatically split into chunks** so that each individual POST stays within PHP's `upload_max_filesize` limit. The chunks are reassembled on the server inside the transaction directory. The client shows a `<progress>` bar during the transfer.
+
+Small files (below `upload_max_filesize − 100 KB`) are sent as a single POST.
+
+After a successful upload the server returns a rendered preview (thumbnail or filename label) that is inserted into the page immediately, without a full page reload.
+
+The no-JS fallback (↻ preload button) still works for environments without JavaScript.
+
+### Validation
+
+Both controls override Nette's built-in file validators so they work with `FileCurrent` and `FileUploaded` values (the Nette originals only accept `FileUpload`):
+
+```php
+$form->addFileControl('portrait', 'Portrait')
+    ->addRule($form::MaxFileSize, 'File is too large (max %d B).', 512 * 1024)
+    ->addRule($form::MimeType, 'Only images are allowed.', ['image/jpeg', 'image/png'])
+    ->addRule($form::Image, 'File must be an image.');
+```
+
+| Rule | Description |
+|---|---|
+| `Form::MaxFileSize` | Maximum file size in bytes. |
+| `Form::MimeType` | Allowed MIME types, e.g. `'image/jpeg'` or an array of types. |
+| `Form::Image` | Shorthand for supported image formats (`image/jpeg`, `image/png`, `image/gif`, `image/webp`). |
+| `Form::Required` / `setRequired()` | Standard Nette required field — a file must be selected or already exist as `FileCurrent`. |
+
+Conditional validation via `addConditionOn()` works the same as for other Nette controls.
+
+### Upload errors
+
+When PHP rejects a file (server-level error), the control adds an error message to itself:
+
+- **A single file exceeds `upload_max_filesize`** — PHP marks the file with `UPLOAD_ERR_INI_SIZE`; the control displays a message with the limit value.
+- **The combined upload exceeds `post_max_size`** — PHP silently discards the entire POST body. The control detects this from `Content-Length` and adds a form-level error before submit detection.
+
+### Values
+
+`FileControl::getValue()` returns:
+
+| Type | Situation |
+|---|---|
+| `FileCurrent` | An existing file from a previous save (or a default value). |
+| `FileUploaded` | A newly uploaded file (stored in the transaction) that needs to be committed to the system. |
+| `null` | No file, or the file was deleted — it should be removed from the system. |
+
+`MultiFileControl::getValue()` returns an array (possibly empty) whose elements are `FileCurrent` or `FileUploaded`.
+
+---
+
+## API
+
 ### setPreviewer()
 
 A previewer can be set on the FileControl to control how file previews are formatted. With `GenericFilePreviewer`, a preview of an image file is available.
