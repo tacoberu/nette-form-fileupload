@@ -62,6 +62,7 @@ class MultiFileControl extends BaseControl implements SignalReceiver
 	 */
 	static function register(string $name = 'FileControl', ?UploadStore $store = Null): void
 	{
+		// @phpstan-ignore argument.type
 		Container::extensionMethod('addMulti' . $name, static function (
 			Container $container,
 			string $controlName,

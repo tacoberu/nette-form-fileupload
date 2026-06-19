@@ -62,6 +62,7 @@ class FileControl extends BaseControl implements SignalReceiver
 	 */
 	static function register(string $name = 'FileControl', ?UploadStore $store = Null): void
 	{
+		// @phpstan-ignore argument.type
 		Container::extensionMethod('add' . $name, static function (
 			Container $container,
 			string $controlName,
