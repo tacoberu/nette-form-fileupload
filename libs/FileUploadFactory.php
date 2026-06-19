@@ -7,15 +7,12 @@
 
 namespace Taco\Nette\Forms\Controls;
 
-use Stringable;
-
-
 class FileUploadFactory
 {
 
 	/**
-	 * Úložiště uchovávající nahrávané soubory před tím, než se skutečně uloží.
-	 * Defaultně to je jen temp adresář, viz UploadStoreTemp
+	 * Storage for uploaded files before they are committed to the system.
+	 * By default just a temp directory; see UploadStoreTemp.
 	 *
 	 * @var UploadStore
 	 */
@@ -29,7 +26,7 @@ class FileUploadFactory
 
 
 	/**
-	 * @param string|Stringable|null $label
+	 * @param string|null $label
 	 */
 	function addUploadControl($label = null): FileControl
 	{
@@ -39,11 +36,11 @@ class FileUploadFactory
 
 
 	/**
-	 * @param string|Stringable|null $label
+	 * @param string|null $label
 	 */
-	function addMultiUploadControl($label = null): MultipleFileControl
+	function addMultiUploadControl($label = null): MultiFileControl
 	{
-		return new MultipleFileControl($label);
+		return new MultiFileControl($label, $this->store);
 	}
 
 }

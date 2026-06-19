@@ -69,6 +69,77 @@ Formulář s více soubory (`MultiFileControl`) — s náhledy obrázků, mazán
 
 
 
+## Co FileControl a MultiFileControl podporují
+
+### Provoz bez JS
+
+**Controly jsou plně funkční i bez JavaScriptu.** Tlačítko ↻ umožňuje uživateli nahrát soubory před odesláním formuláře — stránka provede celý round-trip, ale stav formuláře se zachová. Validace, zobrazení chyb i transakční mechanismus fungují stejně.
+
+### AJAX nahrávání s chunked přenosem
+
+Součástí balíčku jsou **připravené TypeScript a zkompilované JavaScript funkce** (`assets/filecontrol.ts` / `assets/filecontrol.js`), které lze zakomponovat do libovolného existujícího frontendu. Poskytují:
+
+- **Okamžité nahrání po výběru souboru** — není potřeba klikat ↻ ani odesílat formulář
+- **Chunked přenos pro velké soubory** — soubory jsou automaticky rozděleny tak, aby každý POST zůstal pod limitem `upload_max_filesize` PHP; server je v adresáři transakce poskládá zpět
+- **Progress bar** — během chunked přenosu se zobrazuje `<progress>` element
+- **Inline náhled** — po nahrání server vrátí vykreslený náhled nebo jmenovku souboru, která se vloží do stránky bez přenačtení
+
+Malé soubory (pod `upload_max_filesize − 100 KB`) jsou odeslány jako jeden POST. Funkce jsou exportovány jako ES moduly a lze je importovat selektivně:
+
+```js
+import { initMultiFileAjaxUpload, initFileAjaxUpload } from './filecontrol.js';
+
+document.querySelectorAll('[data-taco-type="file multiple"]').forEach(el => {
+    initMultiFileAjaxUpload(el);
+});
+document.querySelectorAll('.taco-filecontrol-single').forEach(el => {
+    initFileAjaxUpload(el);
+});
+```
+
+### Validace
+
+Oba controly přepisují Nette vestavěné validátory souborů tak, aby fungovaly s hodnotami `FileCurrent` i `FileUploaded` (Nette originály akceptují jen `FileUpload`):
+
+```php
+$form->addFileControl('portrait', 'Portrait')
+    ->addRule($form::MaxFileSize, 'Soubor je příliš velký (max %d B).', 512 * 1024)
+    ->addRule($form::MimeType, 'Povoleny jsou jen obrázky.', ['image/jpeg', 'image/png'])
+    ->addRule($form::Image, 'Soubor musí být obrázek.');
+```
+
+| Pravidlo | Popis |
+|---|---|
+| `Form::MaxFileSize` | Maximální velikost souboru v bajtech. Defaultně je nastaven limit `upload_max_filesize` z php.ini. |
+| `Form::MimeType` | Povolené MIME typy, např. `'image/jpeg'` nebo pole typů. |
+| `Form::Image` | Zkratka pro podporované formáty obrázků (`image/jpeg`, `image/png`, `image/gif`, `image/webp`). |
+| `Form::Required` / `setRequired()` | Standardní Nette povinné pole — soubor musí být vybrán nebo již existovat jako `FileCurrent`. |
+
+Podmíněná validace pomocí `addConditionOn()` funguje stejně jako u ostatních Nette controlů.
+
+### Chyby nahrávání
+
+Pokud PHP odmítne soubor (chyba na úrovni serveru), control přidá k sobě chybovou zprávu:
+
+- **Jeden soubor překročí `upload_max_filesize`** — PHP označí soubor chybou `UPLOAD_ERR_INI_SIZE`, control zobrazí zprávu s hodnotou limitu.
+- **Součet souborů překročí `post_max_size`** — PHP tiše vyprázdní celý POST. Control to detekuje z `Content-Length` a přidá chybu na úrovni formuláře ještě před detekcí odeslání.
+
+### Hodnoty
+
+`FileControl::getValue()` vrací:
+
+| Typ | Situace |
+|---|---|
+| `FileCurrent` | Existující soubor z minulého uložení (nebo výchozí hodnota). |
+| `FileUploaded` | Nově nahraný soubor (uložený v transakci), který je třeba uložit do systému. |
+| `null` | Žádný soubor, nebo soubor byl smazán - je třeba smazat ze systému. |
+
+`MultiFileControl::getValue()` vrací pole (může být prázdné), jehož prvky jsou `FileCurrent` nebo `FileUploaded`.
+
+---
+
+## API
+
 ### setPreviewer()
 
 FileControlu je možné nastavit previewer, kterým lze ovlivnit, jak se budou náhledy na soubor formátovat. Použitím `GenericFilePreviewer` je k dispozici náhled obrázkového souboru.
@@ -108,6 +179,13 @@ Automatické promazávání je implementováno v `UploadStoreTemp`. Chová se to
 Aby se rozložila zátěž, smaže se tak pouze `UploadStoreTemp::$gcMaxCount` transakcí/adresářů.
 
 Toto chování je záležitostí pouze implementace `UploadStoreTemp`.
+
+
+## Assets (TypeScript)
+
+The client-side scripts are written in TypeScript and compiled to `assets/filecontrol.js` (symlinked into `examples/document_root/js/`):
+
+	npm run build:assets
 
 
 ## E2E testy (Playwright)

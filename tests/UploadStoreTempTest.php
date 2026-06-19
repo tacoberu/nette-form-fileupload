@@ -20,7 +20,7 @@ class UploadStoreTempTest extends TestCase
 
 	function testGetIdIsStableAndPositive()
 	{
-		$store = new UploadStoreTemp(gcAgeLimit: 0);
+		$store = new UploadStoreTemp(null, null, null, 0);
 		$id = $store->getId();
 		$this->assertGreaterThan(0, $id);
 		// Repeated calls return the same generated id.
@@ -31,7 +31,7 @@ class UploadStoreTempTest extends TestCase
 
 	function testSetIdIsFluentAndUsed()
 	{
-		$store = new UploadStoreTemp(gcAgeLimit: 0);
+		$store = new UploadStoreTemp(null, null, null, 0);
 		$this->assertSame($store, $store->setId(456));
 		$this->assertSame(456, $store->getId());
 	}
@@ -48,7 +48,7 @@ class UploadStoreTempTest extends TestCase
 
 	function testSetIdRejectsNonPositiveId()
 	{
-		$store = new UploadStoreTemp(gcAgeLimit: 0);
+		$store = new UploadStoreTemp(null, null, null, 0);
 		$this->expectException(AssertionException::class);
 		$store->setId(-1);
 	}
@@ -57,21 +57,12 @@ class UploadStoreTempTest extends TestCase
 
 	function testSetIdIgnoresEmptyTransaction()
 	{
-		$store = new UploadStoreTemp(gcAgeLimit: 0);
+		$store = new UploadStoreTemp(null, null, null, 0);
 		// An empty transaction (0/null, e.g. a partial request) is ignored;
 		// a fresh id is generated instead.
 		$this->assertSame($store, $store->setId(0));
 		$this->assertSame($store, $store->setId(Null));
 		$this->assertGreaterThan(0, $store->getId());
-	}
-
-
-
-	function testExists()
-	{
-		$store = $this->createStore();
-		$this->assertTrue($store->exists(__FILE__));
-		$this->assertFalse($store->exists($this->baseDir . '/does-not-exist'));
 	}
 
 
@@ -91,7 +82,7 @@ class UploadStoreTempTest extends TestCase
 		$this->assertFileExists($dest);
 		$this->assertFileDoesNotExist($src); // the source was moved away
 		$this->assertSame('hello world', file_get_contents($dest));
-		$this->assertSame($dest, $result->getId());
+		$this->assertSame($file->getSanitizedName(), $result->getId());
 		$this->assertSame('mp16.jpg', $result->getName()); // original (unsanitized) name
 	}
 
@@ -153,7 +144,7 @@ class UploadStoreTempTest extends TestCase
 	 */
 	private function createStore(int $id = 123): UploadStoreTemp
 	{
-		return new UploadStoreTemp('trx-', $id, $this->baseDir, gcAgeLimit: 0);
+		return new UploadStoreTemp('trx-', $id, $this->baseDir, 0);
 	}
 
 

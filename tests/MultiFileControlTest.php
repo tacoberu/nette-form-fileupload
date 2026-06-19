@@ -25,13 +25,14 @@ class MultiFileControlTest extends TestCase
 	function testUseCheckboxIsSubmittable()
 	{
 		$control = $this->bindControl();
-		$file = new FileCurrent('/uploaded/cat.jpeg', 'image/jpeg');
+		$file = new FileCurrent('/uploaded/cat.jpeg', 'image/jpeg', 0);
 		$control->setValue([$file]);
 
 		$html = (string) $control->getControl();
 
 		$this->assertMatchesRegularExpression('~<input[^>]*type="checkbox"[^>]*name="attachments\[use\]\[\]"~', $html);
-		$this->assertStringContainsString('value="' . Utils::serializeFile($file) . '"', $html);
+		$serialized = Utils::serializeFile($file);
+		$this->assertStringContainsString($serialized, $html);
 	}
 
 
@@ -43,11 +44,12 @@ class MultiFileControlTest extends TestCase
 	function testResubmitKeepsCheckedFiles()
 	{
 		$control = $this->bindControl();
-		$serialized = 'image/jpeg#' . $this->baseDir . '/uploading/txt-123/cat.jpeg';
+		$file = new FileCurrent($this->baseDir . '/uploading/txt-123/cat.jpeg', 'image/jpeg', 0);
+		$serialized = Utils::serializeFile($file);
 		$this->submit($control, [
 			'transaction' => '123',
 			'current' => [$serialized],
-			'use' => [$serialized], // the checked checkbox submits this
+			'use' => [$serialized],
 		]);
 
 		$this->assertCount(1, $control->getValue());
@@ -61,7 +63,8 @@ class MultiFileControlTest extends TestCase
 	function testUncheckedFileIsRemoved()
 	{
 		$control = $this->bindControl();
-		$serialized = 'image/jpeg#' . $this->baseDir . '/uploading/txt-123/cat.jpeg';
+		$file = new FileCurrent($this->baseDir . '/uploading/txt-123/cat.jpeg', 'image/jpeg', 0);
+		$serialized = Utils::serializeFile($file);
 		$this->submit($control, [
 			'transaction' => '123',
 			'current' => [$serialized],
@@ -90,7 +93,7 @@ class MultiFileControlTest extends TestCase
 
 	private function bindControl(): MultiFileControl
 	{
-		$store = new UploadStoreTemp('uploading/txt-', null, $this->baseDir, gcAgeLimit: 0);
+		$store = new UploadStoreTemp('uploading/txt-', null, $this->baseDir, 0);
 		$form = new Form();
 		return $form['attachments'] = new MultiFileControl('Attachments', $store);
 	}
@@ -104,8 +107,10 @@ class MultiFileControlTest extends TestCase
 	{
 		$form = $control->getForm();
 		$httpData = new ReflectionProperty(Form::class, 'httpData');
+		$httpData->setAccessible(true);
 		$httpData->setValue($form, ['attachments' => $attachments]);
 		$submittedBy = new ReflectionProperty(Form::class, 'submittedBy');
+		$submittedBy->setAccessible(true);
 		$submittedBy->setValue($form, True);
 		$control->loadHttpData();
 	}

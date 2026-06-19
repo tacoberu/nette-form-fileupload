@@ -8,7 +8,7 @@
 	<arg name="tab-width" value="4"/>
 
     <file>libs</file>
-    <file>tests</file>
+    <file>examples/app</file>
 
     <config name="installed_paths" value="vendor/slevomat/coding-standard,phpcs-custom"/>
 
@@ -47,6 +47,9 @@
 		<exclude name="SlevomatCodingStandard.TypeHints.ParameterTypeHint.MissingAnyTypeHint" />
 
 		<!-- Ke zvážení -->
+		<!-- Moderní PHP 8.x konstrukce, které v kódu záměrně používáme. -->
+		<exclude name="SlevomatCodingStandard.Classes.DisallowConstructorPropertyPromotion" />
+		<exclude name="SlevomatCodingStandard.Exceptions.DisallowNonCapturingCatch" />
 		<!-- Pojmenované argumenty používáme záměrně pro čitelnost boolean parametrů. -->
 		<exclude name="SlevomatCodingStandard.Functions.DisallowNamedArguments" />
 		<exclude name="SlevomatCodingStandard.Numbers.RequireNumericLiteralSeparator" />

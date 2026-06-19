@@ -69,6 +69,77 @@ A form with multiple files (`MultiFileControl`) — with image previews, deletio
 
 
 
+## What FileControl and MultiFileControl support
+
+### No-JS mode
+
+**The controls are fully functional without JavaScript.** The ↻ preload button lets the user upload files before submitting the form — the page does a full round-trip, but all form state is preserved. File validation, error display, and the transaction mechanism all work the same way.
+
+### AJAX upload with chunked transfer
+
+The package ships with ready-made **TypeScript and compiled JavaScript functions** (`assets/filecontrol.ts` / `assets/filecontrol.js`) that can be integrated into any existing frontend stack. They provide:
+
+- **Immediate upload on file selection** — no need to click ↻ or submit the form
+- **Chunked transfer for large files** — files are automatically split so each POST stays within PHP's `upload_max_filesize` limit; the server reassembles them inside the transaction directory
+- **Progress bar** — a `<progress>` element is shown during chunked transfers
+- **Inline preview** — after upload the server returns a rendered thumbnail or filename label, inserted into the page without a full reload
+
+Small files (below `upload_max_filesize − 100 KB`) are sent as a single POST. The JS functions are exported as ES modules and can be imported selectively:
+
+```js
+import { initMultiFileAjaxUpload, initFileAjaxUpload } from './filecontrol.js';
+
+document.querySelectorAll('[data-taco-type="file multiple"]').forEach(el => {
+    initMultiFileAjaxUpload(el);
+});
+document.querySelectorAll('.taco-filecontrol-single').forEach(el => {
+    initFileAjaxUpload(el);
+});
+```
+
+### Validation
+
+Both controls override Nette's built-in file validators so they work with `FileCurrent` and `FileUploaded` values (the Nette originals only accept `FileUpload`):
+
+```php
+$form->addFileControl('portrait', 'Portrait')
+    ->addRule($form::MaxFileSize, 'File is too large (max %d B).', 512 * 1024)
+    ->addRule($form::MimeType, 'Only images are allowed.', ['image/jpeg', 'image/png'])
+    ->addRule($form::Image, 'File must be an image.');
+```
+
+| Rule | Description |
+|---|---|
+| `Form::MaxFileSize` | Maximum file size in bytes. |
+| `Form::MimeType` | Allowed MIME types, e.g. `'image/jpeg'` or an array of types. |
+| `Form::Image` | Shorthand for supported image formats (`image/jpeg`, `image/png`, `image/gif`, `image/webp`). |
+| `Form::Required` / `setRequired()` | Standard Nette required field — a file must be selected or already exist as `FileCurrent`. |
+
+Conditional validation via `addConditionOn()` works the same as for other Nette controls.
+
+### Upload errors
+
+When PHP rejects a file (server-level error), the control adds an error message to itself:
+
+- **A single file exceeds `upload_max_filesize`** — PHP marks the file with `UPLOAD_ERR_INI_SIZE`; the control displays a message with the limit value.
+- **The combined upload exceeds `post_max_size`** — PHP silently discards the entire POST body. The control detects this from `Content-Length` and adds a form-level error before submit detection.
+
+### Values
+
+`FileControl::getValue()` returns:
+
+| Type | Situation |
+|---|---|
+| `FileCurrent` | An existing file from a previous save (or a default value). |
+| `FileUploaded` | A newly uploaded file (stored in the transaction) that needs to be committed to the system. |
+| `null` | No file, or the file was deleted — it should be removed from the system. |
+
+`MultiFileControl::getValue()` returns an array (possibly empty) whose elements are `FileCurrent` or `FileUploaded`.
+
+---
+
+## API
+
 ### setPreviewer()
 
 A previewer can be set on the FileControl to control how file previews are formatted. With `GenericFilePreviewer`, a preview of an image file is available.
@@ -108,6 +179,13 @@ Automatic cleanup is implemented in `UploadStoreTemp`. It works so that after th
 To spread the load, only `UploadStoreTemp::$gcMaxCount` transactions/directories are deleted at a time.
 
 This behavior is solely a matter of the `UploadStoreTemp` implementation.
+
+
+## Assets (TypeScript)
+
+The client-side scripts are written in TypeScript and compiled to `assets/filecontrol.js` (symlinked into `examples/document_root/js/`):
+
+	npm run build:assets
 
 
 ## E2E tests (Playwright)

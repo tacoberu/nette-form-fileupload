@@ -3,7 +3,6 @@
 use Rector\Config\RectorConfig;
 use Rector\Set\ValueObject\DowngradeLevelSetList;
 use Rector\CodeQuality\Rector\ClassMethod\LocallyCalledStaticMethodToNonStaticRector;
-use Rector\CodeQuality\Rector\Switch_\SwitchTrueToIfRector;
 use Rector\Php71\Rector\List_\ListToArrayDestructRector;
 use Rector\Php74\Rector\Closure\ClosureToArrowFunctionRector;
 
@@ -26,7 +25,6 @@ return RectorConfig::configure()
         LocallyCalledStaticMethodToNonStaticRector::class, // mění static na non-static
         ListToArrayDestructRector::class, // mění static na non-static
         ClosureToArrowFunctionRector::class,
-        SwitchTrueToIfRector::class,    // neměnit switch (True) na if/elseif
         // SymplifyQuoteEscapeRector::class,  // Pokud nechceš měnit uvozovky
         // RecastingRemovalRector::class,     // Odstraňuje zbytečné přetypování
     ])

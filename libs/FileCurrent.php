@@ -11,7 +11,7 @@ use Nette;
 
 
 /**
- * Původní soubor, který je již uložený v systému. V případě nahrazení bude nahrazen novým souborem typu FileUploaded.
+ * An existing file already stored in the system. When replaced, it will be superseded by a new FileUploaded value.
  *
  * @author Martin Takáč <martin@takac.name>
  */
@@ -23,7 +23,7 @@ class FileCurrent
 	/**
 	 * @var string
 	 */
-	private $path;
+	private $id;
 
 	/**
 	 * @var string
@@ -31,73 +31,50 @@ class FileCurrent
 	private $type;
 
 	/**
+	 * @var int
+	 */
+	private $size;
+
+	/**
 	 * @sample "mp16.jpg"
 	 */
-	private ?string $name;
+	private ?string $label;
 
 	/**
-	  * If $committed == True && $remove == True - The file uploaded to the system to be deleted.
-	  * If $committed == False && $remove == True - The file uploaded to the transaction to be removed from the transaction.
-	  */
-	 private bool $remove = False;
-
-	/**
-	 * @param string $path Path to the real file. It serves as an identifier. Whether it is a real file
+	 * @param string $id Path to the real file. It serves as an identifier. Whether it is a real file
 	 * 		that can be loaded is up to the cooperating services. For example FilePreviewer. But usually
 	 * 		it will be a good idea. For example: "/tmp/upload-669965256695/mp16.jpg"
 	 * @param string $type Mimetype as: "image/jpeg"
 	 */
-	function __construct($path, $type, ?string $name = Null)
+	function __construct($id, $type, int $size, ?string $label = Null)
 	{
-		$this->path = $path;
+		$this->id = $id;
 		$this->type = $type;
-		$this->name = $name;
-		if ($this->name === null || $this->name === '' || $this->name === '0') {
-			$this->name = basename($this->path);
+		$this->size = $size;
+		$this->label = $label;
+		if (empty($this->label)) {
+			$this->label = basename($this->id);
 		}
 	}
 
 
 
+	/**
+	 * Human-readable display name of the file.
+	 */
 	function getName(): string
 	{
-		return $this->name;
+		return $this->label;
 	}
 
 
 
-	function getTemporaryFile(): string
-	{
-		return $this->path;
-	}
-
-
-
-	function getPath(): string
-	{
-		return $this->path;
-	}
-
-
-
+	/**
+	 * Internal identifier under which the file is stored in the system; also used as the form reference.
+	 */
 	function getId(): string
 	{
-		return $this->path;
-	}
-
-
-
-	function isRemove(): bool
-	{
-		return $this->remove;
-	}
-
-
-
-	function setRemove(bool $val = True): self
-	{
-		$this->remove = $val;
-		return $this;
+		return $this->id;
 	}
 
 
@@ -109,26 +86,9 @@ class FileCurrent
 
 
 
-	/**
-	 * Has been any file uploaded?
-	 */
-	function isFilled(): bool
-	{
-		return ! $this->remove;
-	}
-
-
-
 	function getSize(): int
 	{
-		return 1;
-	}
-
-
-
-	function getError(): int
-	{
-		return 0;
+		return $this->size;
 	}
 
 }

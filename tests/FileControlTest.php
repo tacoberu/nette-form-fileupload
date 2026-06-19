@@ -31,7 +31,7 @@ class FileControlTest extends TestCase
 
 		$this->submit($control, [
 			'transaction' => '123',
-			'current' => 'image/jpeg#uploaded/account/56695/mp16.jpg',
+			'current' => Utils::serializeFile(new FileCurrent('uploaded/account/56695/mp16.jpg', 'image/jpeg', 0)),
 			'remove' => 'X',
 		]);
 
@@ -59,7 +59,7 @@ class FileControlTest extends TestCase
 
 	private function bindControl(): FileControl
 	{
-		$store = new UploadStoreTemp('trx-', null, sys_get_temp_dir(), gcAgeLimit: 0);
+		$store = new UploadStoreTemp('trx-', null, sys_get_temp_dir(), 0);
 		$form = new Form();
 		return $form['portrait'] = new FileControl('Portrait', $store);
 	}
@@ -73,8 +73,10 @@ class FileControlTest extends TestCase
 	{
 		$form = $control->getForm();
 		$httpData = new ReflectionProperty(Form::class, 'httpData');
+		$httpData->setAccessible(true);
 		$httpData->setValue($form, ['portrait' => $portrait]);
 		$submittedBy = new ReflectionProperty(Form::class, 'submittedBy');
+		$submittedBy->setAccessible(true);
 		$submittedBy->setValue($form, True);
 		$control->loadHttpData();
 	}

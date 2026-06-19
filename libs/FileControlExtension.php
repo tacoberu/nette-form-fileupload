@@ -12,6 +12,8 @@ use Nette\DI\Definitions\Statement;
 use Nette\Schema\Schema;
 use Nette\Schema\Expect;
 use Nette\PhpGenerator\ClassType;
+use function assert;
+use stdClass;
 
 
 class FileControlExtension extends CompilerExtension
@@ -50,6 +52,7 @@ class FileControlExtension extends CompilerExtension
 	function afterCompile(ClassType $class): void
 	{
 		$config = $this->getConfig();
+		assert($config instanceof stdClass);
 		$init = $class->getMethods()['initialize'];
 
 		// Registers the addFileControl() / addMultiFileControl() extension methods

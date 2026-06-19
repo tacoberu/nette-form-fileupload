@@ -8,42 +8,55 @@
 namespace Taco\Nette\Forms\Controls;
 
 use Nette\Forms\Form;
+use Nette\Forms\Control;
+use Nette\Forms;
 use Nette\Http\FileUpload;
+use Nette\Utils\Json;
 use LogicException;
 
 
 class Utils
 {
 
+	const KindUploaded = 'u';
+	const KindCurrent = 'c';
+
 	/**
-	 * @return string 'image/jpeg#tasks/6s3qva8l/4728-05.jpg'
-	 * @param \Taco\Nette\Forms\Controls\FileUploaded|\Taco\Nette\Forms\Controls\FileCurrent $src
+	 * @param FileUploaded|FileCurrent $src
+	 * @return string JSON-encoded file reference
 	 */
 	static function serializeFile($src): string
 	{
-		return $src->getContentType() . '#' . $src->getId();
+		$kind = $src instanceof FileUploaded
+			? self::KindUploaded
+			: self::KindCurrent;
+		return Json::encode([
+			$kind,
+			$src->getContentType(),
+			$src->getSize(),
+			$src->getId(),
+			$src->getName(),
+		]);
 	}
 
 
 
 	/**
-	 * @param string $src 'image/jpeg#tasks/6s3qva8l/4728-05.jpg'
+	 * @param string $src json ['c', 'image/jpeg', 42, 'tasks/6s3qva8l/4728-05.jpg', 'Jmeno souboru.jpg']
+	 * @return FileCurrent|FileUploaded|null
 	 */
-	static function createFileUploadedFromValue(string $src): FileUploaded
+	static function createFileValueFromRaw(string $src)
 	{
-		list($type, $path) = explode('#', $src, 2);
-		return new FileUploaded($path, $type);
-	}
+		if (list($kind, $type, $size, $path, $label) = Json::decode($src)) {
+			if ($kind === self::KindCurrent) {
+				return new FileCurrent($path, $type, (int) $size, $label);
+			}
+			if ($kind === self::KindUploaded) {
+				return new FileUploaded($path, $type, (int) $size, $label);
+			}
+		}
 
-
-
-	/**
-	 * @param string $src 'image/jpeg#tasks/6s3qva8l/4728-05.jpg'
-	 */
-	static function createFileCurrentFromValue(string $src): FileCurrent
-	{
-		list($type, $path) = explode('#', $src, 2);
-		return new FileCurrent($path, $type);
+		return Null;
 	}
 
 
@@ -63,6 +76,68 @@ class Utils
 			}
 		}
 		return array_values($xs);
+	}
+
+
+
+	/**
+	 * Replacement for Nette\Forms\Validator::validateFileSize() — accepts any Control,
+	 * not just UploadControl, so it works with our FileControl / MultiFileControl.
+	 * Use [Utils::class, 'validateFileSize'] as the rule validator to allow removeRule() to find it.
+	 *
+	 * @param mixed ...$args
+	 */
+	static function validateFileSize(Control $control, ...$args): bool
+	{
+		$limit = $args[0] ?? PHP_INT_MAX;
+
+		foreach (self::getValueFrom($control) as $file) {
+			if ($file->getSize() > $limit) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+
+
+	/**
+	 * Replacement for Nette\Forms\Validator::validateMimeType().
+	 * See validateFileSize() for variadic rationale.
+	 *
+	 * @param mixed ...$args
+	 */
+	static function validateMimeType(Control $control, ...$args): bool
+	{
+		$mimeType = $args[0] ?? '';
+		$mimeTypes = is_array($mimeType)
+			? $mimeType
+			: explode(',', (string) $mimeType);
+		foreach (self::getValueFrom($control) as $file) {
+			$type = strtolower($file->getContentType() ?? '');
+			if (!in_array($type, $mimeTypes, true)
+				&& !in_array(preg_replace('#/.*#', '/*', $type), $mimeTypes, true)
+			) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+
+
+	/**
+	 * Replacement for Nette\Forms\Validator::validateImage().
+	 */
+	static function validateImage(Control $control): bool
+	{
+		$imageTypes = Forms\Helpers::getSupportedImages();
+		foreach (self::getValueFrom($control) as $file) {
+			if (!in_array($file->getContentType(), $imageTypes, true)) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 
@@ -101,4 +176,13 @@ class Utils
 		return "{$file->getName()}: {$message}";
 	}
 
+
+	private static function getValueFrom(Control $src): array
+	{
+		$xs = $src->getValue();
+		if (!is_array($xs)) {
+			$xs = [$xs];
+		}
+		return $xs;
+	}
 }
