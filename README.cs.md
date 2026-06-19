@@ -71,17 +71,31 @@ Formulář s více soubory (`MultiFileControl`) — s náhledy obrázků, mazán
 
 ## Co FileControl a MultiFileControl podporují
 
+### Provoz bez JS
+
+**Controly jsou plně funkční i bez JavaScriptu.** Tlačítko ↻ umožňuje uživateli nahrát soubory před odesláním formuláře — stránka provede celý round-trip, ale stav formuláře se zachová. Validace, zobrazení chyb i transakční mechanismus fungují stejně.
+
 ### AJAX nahrávání s chunked přenosem
 
-Pokud je control vložen do Nette `Presenter`u, soubory se nahrají okamžitě po výběru — bez čekání na odeslání formuláře.
+Součástí balíčku jsou **připravené TypeScript a zkompilované JavaScript funkce** (`assets/filecontrol.ts` / `assets/filecontrol.js`), které lze zakomponovat do libovolného existujícího frontendu. Poskytují:
 
-Velké soubory jsou **automaticky rozděleny na chunky** tak, aby každý jednotlivý POST zůstal pod limitem `upload_max_filesize` PHP. Chunky jsou na serveru poskládány zpět v adresáři transakce. Klient zobrazuje `<progress>` bar po dobu přenosu.
+- **Okamžité nahrání po výběru souboru** — není potřeba klikat ↻ ani odesílat formulář
+- **Chunked přenos pro velké soubory** — soubory jsou automaticky rozděleny tak, aby každý POST zůstal pod limitem `upload_max_filesize` PHP; server je v adresáři transakce poskládá zpět
+- **Progress bar** — během chunked přenosu se zobrazuje `<progress>` element
+- **Inline náhled** — po nahrání server vrátí vykreslený náhled nebo jmenovku souboru, která se vloží do stránky bez přenačtení
 
-Malé soubory (pod `upload_max_filesize − 100 KB`) jsou odeslány jako jeden POST.
+Malé soubory (pod `upload_max_filesize − 100 KB`) jsou odeslány jako jeden POST. Funkce jsou exportovány jako ES moduly a lze je importovat selektivně:
 
-Po úspěšném nahrání server vrátí vykreslený náhled (miniaturu nebo jmenovku souboru), který se okamžitě vloží do stránky bez přenačtení.
+```js
+import { initMultiFileAjaxUpload, initFileAjaxUpload } from './filecontrol.js';
 
-No-JS fallback (tlačítko ↻ pro přednahrání) stále funguje v prostředích bez JavaScriptu.
+document.querySelectorAll('[data-taco-type="file multiple"]').forEach(el => {
+    initMultiFileAjaxUpload(el);
+});
+document.querySelectorAll('.taco-filecontrol-single').forEach(el => {
+    initFileAjaxUpload(el);
+});
+```
 
 ### Validace
 

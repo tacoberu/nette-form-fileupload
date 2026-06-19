@@ -71,17 +71,31 @@ A form with multiple files (`MultiFileControl`) — with image previews, deletio
 
 ## What FileControl and MultiFileControl support
 
+### No-JS mode
+
+**The controls are fully functional without JavaScript.** The ↻ preload button lets the user upload files before submitting the form — the page does a full round-trip, but all form state is preserved. File validation, error display, and the transaction mechanism all work the same way.
+
 ### AJAX upload with chunked transfer
 
-When either control is embedded inside a Nette `Presenter`, files are uploaded immediately after the user selects them — without waiting for the form to be submitted.
+The package ships with ready-made **TypeScript and compiled JavaScript functions** (`assets/filecontrol.ts` / `assets/filecontrol.js`) that can be integrated into any existing frontend stack. They provide:
 
-Large files are **automatically split into chunks** so that each individual POST stays within PHP's `upload_max_filesize` limit. The chunks are reassembled on the server inside the transaction directory. The client shows a `<progress>` bar during the transfer.
+- **Immediate upload on file selection** — no need to click ↻ or submit the form
+- **Chunked transfer for large files** — files are automatically split so each POST stays within PHP's `upload_max_filesize` limit; the server reassembles them inside the transaction directory
+- **Progress bar** — a `<progress>` element is shown during chunked transfers
+- **Inline preview** — after upload the server returns a rendered thumbnail or filename label, inserted into the page without a full reload
 
-Small files (below `upload_max_filesize − 100 KB`) are sent as a single POST.
+Small files (below `upload_max_filesize − 100 KB`) are sent as a single POST. The JS functions are exported as ES modules and can be imported selectively:
 
-After a successful upload the server returns a rendered preview (thumbnail or filename label) that is inserted into the page immediately, without a full page reload.
+```js
+import { initMultiFileAjaxUpload, initFileAjaxUpload } from './filecontrol.js';
 
-The no-JS fallback (↻ preload button) still works for environments without JavaScript.
+document.querySelectorAll('[data-taco-type="file multiple"]').forEach(el => {
+    initMultiFileAjaxUpload(el);
+});
+document.querySelectorAll('.taco-filecontrol-single').forEach(el => {
+    initFileAjaxUpload(el);
+});
+```
 
 ### Validation
 
