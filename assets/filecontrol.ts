@@ -46,4 +46,30 @@ function initFileHideOnNew(container: HTMLElement): void {
 	});
 }
 
-export { initMultiFileAutoPreload, initFileHideOnNew };
+/**
+ * Inserts a clear (×) button right after the file input.
+ * The button is hidden until the user selects a file; clicking it resets the input.
+ *
+ * @param fileInput - input[type="file"] element
+ */
+function initFileClearButton(fileInput: HTMLInputElement): void {
+	const button = document.createElement('button');
+	button.type = 'button';
+	button.textContent = '✕';
+	button.className = 'taco-filecontrol-remove';
+	button.style.display = 'none';
+	fileInput.after(button);
+
+	fileInput.addEventListener('change', () => {
+		button.style.display = fileInput.files && fileInput.files.length > 0 ? '' : 'none';
+	});
+
+	button.addEventListener('click', () => {
+		fileInput.value = '';
+		button.style.display = 'none';
+		fileInput.dispatchEvent(new Event('change'));
+	});
+}
+
+
+export { initMultiFileAutoPreload, initFileHideOnNew, initFileClearButton };

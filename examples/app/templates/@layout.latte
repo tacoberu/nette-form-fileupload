@@ -22,11 +22,13 @@
 	<script src="{$basePath}/js/netteForms.min.js"></script>
 	<script src="{$basePath}/js/netteAjax.js"></script>
 	<script type="module">
-		import { initMultiFileAutoPreload, initFileHideOnNew } from '/js/filecontrol.js';
+		import { initMultiFileAutoPreload, initFileHideOnNew, initFileClearButton } from '/js/filecontrol.js';
 		document.querySelectorAll('[data-taco-type="file multiple"]')
 			.forEach(initMultiFileAutoPreload);
 		document.querySelectorAll('.taco-filecontrol-single')
 			.forEach(initFileHideOnNew);
+		document.querySelectorAll('.taco-filecontrol-single input[type="file"]')
+			.forEach(initFileClearButton);
 	</script>
 	<script type="text/javascript">
 		$(function() {
