@@ -58,7 +58,7 @@ class GenericFilePreviewerTest extends TestCase
 		$html = $previewer->getPreviewControlFor(
 			$store,
 			$control,
-			new FileUploaded('the-cat.jpeg', 'image/jpeg', 0, 'kitten.jpeg')
+			new FileUploaded($store, 'the-cat.jpeg', 'image/jpeg', 0, 'kitten.jpeg')
 		);
 
 		$this->assertPreview($html, 'kitten.jpeg');

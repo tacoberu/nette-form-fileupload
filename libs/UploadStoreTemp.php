@@ -167,7 +167,7 @@ class UploadStoreTemp implements UploadStore
 		}
 
 		$file->move($path);
-		return new FileUploaded($name, $file->contentType, $file->getSize(), $file->getUntrustedName());
+		return new FileUploaded($this, $name, $file->contentType, $file->getSize(), $file->getUntrustedName());
 	}
 
 
@@ -212,7 +212,7 @@ class UploadStoreTemp implements UploadStore
 			? $detected
 			: 'application/octet-stream';
 
-		return new FileUploaded($name, $type, (int) filesize($finalPath), $chunk->getUntrustedName());
+		return new FileUploaded($this, $name, $type, (int) filesize($finalPath), $chunk->getUntrustedName());
 	}
 
 

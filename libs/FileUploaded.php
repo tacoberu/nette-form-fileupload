@@ -8,6 +8,8 @@
 namespace Taco\Nette\Forms\Controls;
 
 use Nette;
+use Psr\Http\Message\StreamInterface;
+use RuntimeException;
 
 
 /**
@@ -19,6 +21,8 @@ class FileUploaded
 {
 
 	use Nette\SmartObject;
+
+	private UploadStore $store;
 
 	/**
 	 * @var string
@@ -46,8 +50,9 @@ class FileUploaded
 	 * 		But usually it will be a good idea. For example: "/tmp/upload-669965256695/mp16.jpg"
 	 * @param string $type Mimetype as: "image/jpeg"
 	 */
-	function __construct($id, $type, int $size, ?string $label = Null)
+	function __construct(UploadStore $store, $id, $type, int $size, ?string $label = Null)
 	{
+		$this->store = $store;
 		$this->id = $id;
 		$this->type = $type;
 		$this->size = $size;
@@ -83,6 +88,17 @@ class FileUploaded
 	function getSize(): int
 	{
 		return $this->size;
+	}
+
+
+
+	function getContent(): StreamInterface
+	{
+		$path = $this->store->getRealPathFrom($this);
+		if ($path === Null) {
+			throw new RuntimeException("File '{$this->id}' no longer exists in the store.");
+		}
+		return new FileStream($path);
 	}
 
 }

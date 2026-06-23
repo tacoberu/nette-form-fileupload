@@ -201,7 +201,7 @@ class MultiFileControl extends BaseControl implements SignalReceiver
 				if (!in_array($rawvalue, $used, True)) {
 					continue;
 				}
-				$value = Utils::createFileValueFromRaw($rawvalue);
+				$value = Utils::createFileValueFromRaw($this->store, $rawvalue);
 				$values[] = $value;
 			}
 		}

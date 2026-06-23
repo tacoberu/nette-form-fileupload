@@ -45,14 +45,14 @@ class Utils
 	 * @param string $src json ['c', 'image/jpeg', 42, 'tasks/6s3qva8l/4728-05.jpg', 'Jmeno souboru.jpg']
 	 * @return FileCurrent|FileUploaded|null
 	 */
-	static function createFileValueFromRaw(string $src)
+	static function createFileValueFromRaw(UploadStore $store, string $src)
 	{
 		if (list($kind, $type, $size, $path, $label) = Json::decode($src)) {
 			if ($kind === self::KindCurrent) {
 				return new FileCurrent($path, $type, (int) $size, $label);
 			}
 			if ($kind === self::KindUploaded) {
-				return new FileUploaded($path, $type, (int) $size, $label);
+				return new FileUploaded($store, $path, $type, (int) $size, $label);
 			}
 		}
 

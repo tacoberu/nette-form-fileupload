@@ -30,7 +30,7 @@ class UtilsTest extends TestCase
 
 	function testSerializeFileUploaded()
 	{
-		$src = new FileUploaded("tasks/6s3qva8l/4728-05.jpg", "image/jpeg", 42);
+		$src = new FileUploaded($this->createMock(UploadStore::class), "tasks/6s3qva8l/4728-05.jpg", "image/jpeg", 42);
 		$this->assertSame(
 			Json::encode(['u', 'image/jpeg', 42, 'tasks/6s3qva8l/4728-05.jpg', '4728-05.jpg']),
 			Utils::serializeFile($src)
@@ -41,15 +41,17 @@ class UtilsTest extends TestCase
 
 	function testCreateFileValueFromRaw()
 	{
+		$store = $this->createMock(UploadStore::class);
+
 		$src = new FileCurrent("tasks/6s3qva8l/4728-05.jpg", "image/jpeg", 42);
-		$result = Utils::createFileValueFromRaw(Utils::serializeFile($src));
+		$result = Utils::createFileValueFromRaw($store, Utils::serializeFile($src));
 		$this->assertInstanceOf(FileCurrent::class, $result);
 		$this->assertSame('tasks/6s3qva8l/4728-05.jpg', $result->getId());
 		$this->assertSame('image/jpeg', $result->getContentType());
 		$this->assertSame(42, $result->getSize());
 
-		$src2 = new FileUploaded("tasks/6s3qva8l/4728-05.jpg", "image/jpeg", 42);
-		$result2 = Utils::createFileValueFromRaw(Utils::serializeFile($src2));
+		$src2 = new FileUploaded($store, "tasks/6s3qva8l/4728-05.jpg", "image/jpeg", 42);
+		$result2 = Utils::createFileValueFromRaw($store, Utils::serializeFile($src2));
 		$this->assertInstanceOf(FileUploaded::class, $result2);
 		$this->assertSame('tasks/6s3qva8l/4728-05.jpg', $result2->getId());
 		$this->assertSame('image/jpeg', $result2->getContentType());

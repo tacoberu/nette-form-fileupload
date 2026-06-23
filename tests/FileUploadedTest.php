@@ -15,7 +15,7 @@ class FileUploadedTest extends TestCase
 
 	function testFreshFileWithDerivedName()
 	{
-		$inst = new FileUploaded("/tmp/upload-669965256695/mp16.jpg", "image/jpeg", 0);
+		$inst = new FileUploaded($this->createMock(UploadStore::class), "/tmp/upload-669965256695/mp16.jpg", "image/jpeg", 0);
 		$this->assertSame('mp16.jpg', $inst->getName());
 		$this->assertSame('/tmp/upload-669965256695/mp16.jpg', $inst->getId());
 		$this->assertSame('image/jpeg', $inst->getContentType());
@@ -26,7 +26,7 @@ class FileUploadedTest extends TestCase
 
 	function testFreshFileWithExplicitName()
 	{
-		$inst = new FileUploaded("/tmp/upload-669965256695/mp16.jpg", "image/jpeg", 0, "portrait.jpg");
+		$inst = new FileUploaded($this->createMock(UploadStore::class), "/tmp/upload-669965256695/mp16.jpg", "image/jpeg", 0, "portrait.jpg");
 		$this->assertSame('portrait.jpg', $inst->getName());
 		$this->assertSame('/tmp/upload-669965256695/mp16.jpg', $inst->getId());
 		$this->assertSame('image/jpeg', $inst->getContentType());
@@ -36,7 +36,7 @@ class FileUploadedTest extends TestCase
 
 	function testEmptyNameFallsBackToBasename()
 	{
-		$inst = new FileUploaded("/tmp/upload-669965256695/mp16.jpg", "image/jpeg", 0, '');
+		$inst = new FileUploaded($this->createMock(UploadStore::class), "/tmp/upload-669965256695/mp16.jpg", "image/jpeg", 0, '');
 		$this->assertSame('mp16.jpg', $inst->getName());
 	}
 
@@ -44,7 +44,7 @@ class FileUploadedTest extends TestCase
 
 	function testSizeIsStored()
 	{
-		$inst = new FileUploaded("/tmp/upload-669965256695/mp16.jpg", "image/jpeg", 42);
+		$inst = new FileUploaded($this->createMock(UploadStore::class), "/tmp/upload-669965256695/mp16.jpg", "image/jpeg", 42);
 		$this->assertSame(42, $inst->getSize());
 	}
 

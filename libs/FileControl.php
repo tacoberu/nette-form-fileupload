@@ -154,7 +154,7 @@ class FileControl extends BaseControl implements SignalReceiver
 			}
 		}
 		elseif ($rawvalue = $this->getHttpData(Form::DataText, '[current]')) {
-			$this->value = Utils::createFileValueFromRaw($rawvalue);
+			$this->value = Utils::createFileValueFromRaw($this->store, $rawvalue);
 		}
 		else {
 			$this->value = null;
