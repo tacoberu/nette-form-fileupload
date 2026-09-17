@@ -113,6 +113,25 @@ class UploadStoreTempTest extends TestCase
 
 
 
+	/**
+	 * `__destruct()` je jen GC úklid starých transakcí - běží pokaždé, kdy je gcLimit
+	 * nastaven (výchozí `filecontrol` v config.neon typicky prefix jako "uploading/txt-",
+	 * tedy s podadresářem). Pokud tenhle podadresář ještě nikdo nezaložil (žádný upload)
+	 * nebo ho někdo zvenčí smazal, nemá GC co promazávat - dřív ale spadlo na
+	 * `FilesystemIterator`, který na neexistující adresář hází `UnexpectedValueException`.
+	 */
+	function testDestructDoesNotFailWhenGcSubdirectoryDoesNotExist()
+	{
+		$store = new UploadStoreTemp('uploading/trx-', 123, $this->baseDir);
+		$this->assertDirectoryDoesNotExist($this->baseDir . '/uploading');
+
+		unset($store); // spustí __destruct() - nesmí spadnout
+
+		$this->addToAssertionCount(1);
+	}
+
+
+
 	function testCalculateAgeOfId()
 	{
 		$now = (int) (microtime(True) * 10000) - UploadStoreTemp::EPOCH_START;

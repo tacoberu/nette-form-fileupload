@@ -100,6 +100,12 @@ class UploadStoreTemp implements UploadStore
 			return;
 		}
 		$path = implode('/', array_merge([$this->getBaseDir()], array_slice(explode('/', $this->prefix), 0, -1)));
+		if ( ! is_dir($path)) {
+			// Nic k úklidu - adresář ještě nikdo nevytvořil (žádný upload) nebo ho někdo
+			// smazal zvenčí. append() ho při reálném uploadu založí sám (mkdir), tady
+			// není důvod ho zakládat jen kvůli GC, který nemá co promazávat.
+			return;
+		}
 		$pathWithPrefix = $this->getBaseDir() . DIRECTORY_SEPARATOR . $this->prefix;
 		$count = $this->gcMaxCount;
 		foreach (new FilesystemIterator($path) as $item) {
