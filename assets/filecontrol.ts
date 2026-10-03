@@ -269,9 +269,12 @@ function appendErrorRow(container: HTMLElement, message: string): void {
 }
 
 
-/** 'attachments[transaction]' → 'attachments' */
+/**
+ * 'attachments[transaction]' → 'attachments'
+ * 'pics[1][content][transaction]' → 'pics[1][content]' (control nested in a container/repeater)
+ */
 function extractControlName(inputName: string): string {
-	return inputName.replace(/\[.*$/, '');
+	return inputName.replace(/\[transaction\]$/, '');
 }
 
 

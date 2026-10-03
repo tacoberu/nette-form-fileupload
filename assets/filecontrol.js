@@ -214,9 +214,12 @@ function appendErrorRow(container, message) {
     row.textContent = message;
     container.insertBefore(row, uploadRow ?? null);
 }
-/** 'attachments[transaction]' → 'attachments' */
+/**
+ * 'attachments[transaction]' → 'attachments'
+ * 'pics[1][content][transaction]' → 'pics[1][content]' (control nested in a container/repeater)
+ */
 function extractControlName(inputName) {
-    return inputName.replace(/\[.*$/, '');
+    return inputName.replace(/\[transaction\]$/, '');
 }
 /**
  * For FileControl (single file): when a new file is selected, hide the remove
