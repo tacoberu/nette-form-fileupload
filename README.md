@@ -47,7 +47,10 @@ extensions:
 
 filecontrol:
     store: Taco\Nette\Forms\Controls\UploadStoreTemp('uploading/txt-', null, %tempDir%)
+    maxChunkSize: 921600  # optional, bytes
 ```
+
+`maxChunkSize` caps the size of one AJAX-uploaded part (larger files are split by the client). By default it is derived from PHP's `upload_max_filesize`; set it lower when a reverse proxy in front of PHP accepts smaller requests (e.g. nginx `client_max_body_size`, 1 MB by default, otherwise the upload fails with `413 Request Entity Too Large`).
 
 Use in a form:
 

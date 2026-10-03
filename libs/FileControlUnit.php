@@ -31,6 +31,43 @@ trait FileControlUnit
 	private string $prefix = "taco-filecontrol";
 
 	/**
+	 * Upper limit of one uploaded part in bytes (null = only what PHP allows). Useful when
+	 * something in front of PHP (a reverse proxy, e.g. nginx `client_max_body_size` = 1 MB by
+	 * default) accepts smaller requests than `upload_max_filesize`.
+	 */
+	private ?int $maxChunkSize = Null;
+
+
+	/**
+	 * Limits the size of one uploaded part (the client splits larger files). Null = no limit
+	 * beyond `upload_max_filesize`.
+	 */
+	function setMaxChunkSize(?int $bytes): self
+	{
+		if ($bytes !== Null && $bytes < 1) {
+			throw new \InvalidArgumentException("Max chunk size must be positive, '{$bytes}' given.");
+		}
+		$this->maxChunkSize = $bytes;
+		return $this;
+	}
+
+
+
+	/**
+	 * Size of one uploaded part: what PHP allows (minus a reserve for the request envelope),
+	 * capped by setMaxChunkSize().
+	 */
+	private function resolveChunkSize(): int
+	{
+		$size = Forms\Helpers::iniGetSize('upload_max_filesize') - 100 * 1024;
+		if ($this->maxChunkSize !== Null) {
+			$size = min($size, $this->maxChunkSize);
+		}
+		return max(1, $size);
+	}
+
+
+	/**
 	 * By setting the previewer, uploaded files will be represented by their respective previews.
 	 */
 	function setPreviewer(FilePreviewer $var): self

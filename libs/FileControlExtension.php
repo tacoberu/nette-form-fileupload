@@ -28,6 +28,11 @@ class FileControlExtension extends CompilerExtension
 			// The ability to specify and set up your own transaction store.
 			// Not required - default is UploadStoreTemp.
 			'store' => Expect::type(Statement::class)->nullable(),
+
+			// Upper limit of one uploaded part in bytes (large files are split by the client).
+			// Null = only what PHP allows (`upload_max_filesize`). Set it when a reverse proxy in
+			// front of PHP accepts smaller requests (nginx: `client_max_body_size`, 1 MB by default).
+			'maxChunkSize' => Expect::int()->min(1)->nullable(),
 		]);
 	}
 
@@ -58,12 +63,12 @@ class FileControlExtension extends CompilerExtension
 		// Registers the addFileControl() / addMultiFileControl() extension methods
 		// with the store taken from the DI container.
 		$init->addBody(
-			FileControl::class . '::register(?, $this->getService(?));',
-			[$config->name, $this->prefix('store')]
+			FileControl::class . '::register(?, $this->getService(?), ?);',
+			[$config->name, $this->prefix('store'), $config->maxChunkSize]
 		);
 		$init->addBody(
-			MultiFileControl::class . '::register(?, $this->getService(?));',
-			[$config->name, $this->prefix('store')]
+			MultiFileControl::class . '::register(?, $this->getService(?), ?);',
+			[$config->name, $this->prefix('store'), $config->maxChunkSize]
 		);
 	}
 

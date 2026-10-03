@@ -78,15 +78,16 @@ class MultiFileControl extends BaseControl implements SignalReceiver
 	 * which creates a MultiFileControl with the store injected from the DI container.
 	 * The store can still be overridden by an explicit last argument.
 	 */
-	static function register(string $name = 'FileControl', ?UploadStore $store = Null): void
+	static function register(string $name = 'FileControl', ?UploadStore $store = Null, ?int $maxChunkSize = Null): void
 	{
 		Container::extensionMethod('addMulti' . $name, static function (
 			Container $container,
 			string $controlName,
 			$label = Null,
 			?UploadStore $localStore = Null
-		) use ($store): self {
+		) use ($store, $maxChunkSize): self {
 			$control = new self($label, $localStore ?: $store);
+			$control->setMaxChunkSize($maxChunkSize);
 			$container->addComponent($control, $controlName);
 			return $control;
 		});
@@ -250,8 +251,7 @@ class MultiFileControl extends BaseControl implements SignalReceiver
 		$container = clone $this->container;
 		if ($this->lookup(Presenter::class, false) !== null) {
 			$container->setAttribute('data-upload-url', $this->link(':upload!'));
-			$chunkSize = Forms\Helpers::iniGetSize('upload_max_filesize') - 100 * 1024;
-			$container->setAttribute('data-chunk-size', (string) max(1, $chunkSize));
+			$container->setAttribute('data-chunk-size', (string) $this->resolveChunkSize());
 		}
 		foreach ($this->value as $item) {
 			$container->addHtml($this->getItemControlPart($name, $item));

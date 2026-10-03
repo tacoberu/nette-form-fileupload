@@ -88,6 +88,28 @@ class UploadStoreTempTest extends TestCase
 
 
 
+	/**
+	 * Tentýž FileUpload (instance z requestu) se může zpracovat dvakrát - druhý append() nesmí
+	 * soubor smazat (FileUpload::move() maže cíl, který by byl totožný se zdrojem).
+	 */
+	function testAppendSameUploadTwiceKeepsFile()
+	{
+		$store = $this->createStore(123);
+		$src = $this->baseDir . '/source.bin';
+		file_put_contents($src, 'hello world');
+		$file = $this->upload('mp16.jpg', $src);
+		$dest = $this->baseDir . DIRECTORY_SEPARATOR . 'trx-123'
+			. DIRECTORY_SEPARATOR . $file->getSanitizedName();
+
+		$store->append($file);
+		$result = $store->append($file);
+
+		$this->assertSame('hello world', file_get_contents($dest));
+		$this->assertSame($file->getSanitizedName(), $result->getId());
+	}
+
+
+
 	function testDestroyRemovesTransactionDir()
 	{
 		$store = $this->createStore(123);

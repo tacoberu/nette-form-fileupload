@@ -172,8 +172,23 @@ class UploadStoreTemp implements UploadStore
 			mkdir($dir, 0777, True);
 		}
 
-		$file->move($path);
+		// loadHttpData() může tentýž FileUpload (stejná instance z requestu) zpracovat víckrát
+		// (např. opakované načtení dat formuláře). FileUpload::move() nejdřív smaže cíl a pak
+		// přejmenuje zdroj - po prvním přesunu jsou oba totožné, takže by druhé volání soubor
+		// smazalo a selhalo na "No such file or directory".
+		if ( ! self::isSameFile($file->getTemporaryFile(), $path)) {
+			$file->move($path);
+		}
 		return new FileUploaded($this, $name, $file->contentType, $file->getSize(), $file->getUntrustedName());
+	}
+
+
+
+	private static function isSameFile(string $a, string $b): bool
+	{
+		$ra = realpath($a);
+		$rb = realpath($b);
+		return $ra !== False && $ra === $rb;
 	}
 
 

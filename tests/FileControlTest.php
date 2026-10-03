@@ -57,6 +57,38 @@ class FileControlTest extends TestCase
 
 
 
+	/**
+	 * Velikost části se řídí PHP (`upload_max_filesize` mínus rezerva); setMaxChunkSize() ji může
+	 * jen snížit (typicky kvůli reverse proxy s menším limitem těla požadavku), nikdy zvýšit.
+	 */
+	function testMaxChunkSizeOnlyLowersTheLimitOfPhp()
+	{
+		$control = $this->bindControl();
+		$resolve = new \ReflectionMethod($control, 'resolveChunkSize');
+		$resolve->setAccessible(True);
+		$auto = $resolve->invoke($control);
+		$this->assertGreaterThan(0, $auto);
+
+		$control->setMaxChunkSize(1000);
+		$this->assertSame(1000, $resolve->invoke($control));
+
+		$control->setMaxChunkSize($auto + 1000000);
+		$this->assertSame($auto, $resolve->invoke($control));
+
+		$control->setMaxChunkSize(Null);
+		$this->assertSame($auto, $resolve->invoke($control));
+	}
+
+
+
+	function testMaxChunkSizeMustBePositive()
+	{
+		$this->expectException(\InvalidArgumentException::class);
+		$this->bindControl()->setMaxChunkSize(0);
+	}
+
+
+
 	private function bindControl(): FileControl
 	{
 		$store = new UploadStoreTemp('trx-', null, sys_get_temp_dir(), 0);
